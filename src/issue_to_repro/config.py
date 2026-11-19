@@ -1,0 +1,33 @@
+"""Runtime settings, read from environment variables (or a local .env file)."""
+
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # Gemini backend. With Vertex AI, auth comes from Application Default Credentials;
+    # without it, google-genai reads GOOGLE_API_KEY (AI Studio).
+    google_genai_use_vertexai: bool = True
+    google_cloud_project: str | None = None
+    google_cloud_location: str = "us-central1"
+
+    # Model ids are configurable so they can follow Gemini releases without code changes.
+    coordinator_model: str = "gemini-2.5-pro"
+    worker_model: str = "gemini-2.5-flash"
+
+    # Only checkouts under this directory may be searched or have tests run in them.
+    workspace_root: str = "workspace"
+    # A reproduction must fail on every one of these runs to count (flakiness guard).
+    repro_runs: int = 3
+    test_timeout_s: int = 120
+    # Reproducer <-> verifier rounds before giving up on an issue.
+    max_repro_attempts: int = 4
+
+    # Optional; raises GitHub's API rate limit. Public issues work without it.
+    github_token: SecretStr | None = None
+
+
+def get_settings() -> Settings:
+    return Settings()
