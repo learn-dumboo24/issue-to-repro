@@ -8,7 +8,7 @@ on:
       - .github/workflows/datasets.yml
 
 permissions:
-  contents: read
+  contents: write  # commits the built datasets back to the branch
   issues: read
 
 jobs:
@@ -39,3 +39,13 @@ jobs:
           name: datasets
           path: out/*.jsonl
           if-no-files-found: error
+      - name: Commit datasets
+        # Pushes made with GITHUB_TOKEN do not trigger workflows, so this cannot loop.
+        run: |
+          cp out/*.jsonl datasets/
+          git add datasets/*.jsonl
+          if git diff --cached --quiet; then echo "datasets unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Rebuild backtest datasets from sources.json" -m "Built by run ${{ github.run_id }}."
+          git push origin "HEAD:${GITHUB_REF_NAME}"
