@@ -1,4 +1,4 @@
-"""Command line: `issue-to-repro reproduce ...` and `issue-to-repro dataset build ...`."""
+"""Command line: `issue-to-repro reproduce | dataset build | backtest run | backtest report`."""
 
 import argparse
 import asyncio
@@ -32,6 +32,19 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--checkout", required=True, help="Clone of --repo with full history")
     build.add_argument("--since", default="2019-01-01", help="Only fixes after this date")
     build.add_argument("--out", required=True, help="Output .jsonl path")
+
+    backtest = commands.add_parser("backtest", help="Replay a dataset and score the agents")
+    backtest_commands = backtest.add_subparsers(dest="backtest_command", required=True)
+    run = backtest_commands.add_parser("run", help="Run the agents on dataset cases (calls Gemini)")
+    run.add_argument("--dataset", required=True, help="Dataset .jsonl")
+    run.add_argument("--source", required=True, help="Full clone of the dataset's repository")
+    run.add_argument("--out", required=True, help="Results .jsonl (appended; reruns resume)")
+    run.add_argument("--issues", help="Comma-separated issue numbers to run (default: all)")
+    run.add_argument("--limit", type=int, help="Run at most this many cases")
+    report = backtest_commands.add_parser("report", help="Summarise a results file as Markdown")
+    report.add_argument("--results", required=True, help="Results .jsonl")
+    report.add_argument("--title", default="Backtest results")
+    report.add_argument("--out", help="Write Markdown here instead of printing it")
     return parser
 
 
@@ -43,8 +56,12 @@ def main(argv: list[str] | None = None) -> None:
         if not match:
             parser.error("issue must look like owner/name#123")
         _reproduce(match["repo"], int(match["number"]), args.checkout, args.dry_run)
-    else:
+    elif args.command == "dataset":
         _dataset_build(args.repo, args.checkout, args.since, args.out)
+    elif args.backtest_command == "run":
+        _backtest_run(args.dataset, args.source, args.out, args.issues, args.limit)
+    else:
+        _backtest_report(args.results, args.title, args.out)
 
 
 def _reproduce(repo: str, number: int, checkout: str, dry_run: bool) -> None:
@@ -67,6 +84,35 @@ def _dataset_build(repo: str, checkout: str, since: str, out: str) -> None:
     for skip in skipped:
         print(f"skipped #{skip.issue_number}: {skip.reason}", file=sys.stderr)
     print(f"wrote {written} cases to {out} ({len(skipped)} skipped)")
+
+
+def _backtest_run(
+    dataset: str, source: str, out: str, issues: str | None, limit: int | None
+) -> None:
+    from .backtest.dataset import read_jsonl
+    from .backtest.runner import default_prepare, run_backtest
+    from .config import get_settings
+
+    cases = read_jsonl(dataset)
+    if issues:
+        wanted = {int(n) for n in issues.split(",")}
+        cases = [c for c in cases if c.issue_number in wanted]
+    cases = cases[:limit] if limit else cases
+    workspace = get_settings().workspace_root
+    run_backtest(cases, out, default_prepare(source, workspace))
+
+
+def _backtest_report(results: str, title: str, out: str | None) -> None:
+    from pathlib import Path
+
+    from .backtest.report import load_results, render_markdown
+
+    markdown = render_markdown(load_results(results), title)
+    if out:
+        Path(out).write_text(markdown, encoding="utf-8")
+        print(f"wrote {out}")
+    else:
+        print(markdown, end="")
 
 
 async def _run(root: "BaseAgent", prompt: str) -> None:
