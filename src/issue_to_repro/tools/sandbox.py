@@ -9,6 +9,7 @@ import subprocess
 import sys
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from ..config import get_settings
 from .workspace import resolve_checkout
@@ -65,7 +66,7 @@ def combine(outcomes: list[RunOutcome]) -> Verdict:
     return Verdict.FLAKY
 
 
-def run_reproduction(repo_dir: str, test_relpath: str, test_code: str) -> dict:
+def run_reproduction(repo_dir: str, test_relpath: str, test_code: str) -> dict[str, Any]:
     """Write `test_code` to `test_relpath` in the checkout, run it N times, return the verdict.
 
     `test_relpath` must be a repo-relative file named test_issue_repro*.py.
