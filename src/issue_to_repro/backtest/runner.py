@@ -127,7 +127,7 @@ def run_backtest(
     settings = settings or get_settings()
     run_agents = run_agents or run_agents_adk
     out = Path(out_path)
-    done = {json.loads(line)["case_id"] for line in _lines(out)}
+    done = {r["case_id"] for r in map(json.loads, _lines(out)) if not is_retryable(r)}
     results = []
     for case in cases:
         if case.case_id in done:
@@ -143,6 +143,13 @@ def run_backtest(
         )
         results.append(result)
     return results
+
+
+def is_retryable(result: dict[str, Any]) -> bool:
+    """A case that never got going because of a transient API error is rerun on resume."""
+    stopped = result.get("stopped") or ""
+    transient = stopped.startswith(("api_error 429", "api_error 5"))
+    return transient and result.get("attempts", 0) == 0
 
 
 def default_prepare(source: str | Path, workspace_root: str | Path) -> Prepare:

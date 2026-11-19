@@ -11,6 +11,7 @@ from issue_to_repro.backtest.runner import (
     AgentRun,
     build_prompt,
     check_against_fix,
+    is_retryable,
     run_backtest,
 )
 from issue_to_repro.config import Settings
@@ -133,3 +134,25 @@ def test_offline_agents_cannot_fetch_issues():
         "fetch_issue_tool",
         "search_code_tool",
     ]
+
+
+def test_transient_api_errors_are_retried_on_resume(setup):
+    case, prepare, out = setup
+
+    def overloaded(case, checkout, settings):
+        return AgentRun(stopped="api_error 503: high demand")
+
+    [first] = run_backtest([case], out, prepare, overloaded, log=lambda m: None)
+    assert first.verdict == "no_attempt"
+    [second] = run_backtest(
+        [case], out, prepare, agent_writing(FIXED_BEHAVIOUR), log=lambda m: None
+    )
+    assert second.fail_to_pass is True
+    assert len(out.read_text().splitlines()) == 2
+
+
+def test_is_retryable():
+    assert is_retryable({"stopped": "api_error 429: quota", "attempts": 0})
+    assert not is_retryable({"stopped": "api_error 400: bad request", "attempts": 0})
+    assert not is_retryable({"stopped": "api_error 503: x", "attempts": 2})
+    assert not is_retryable({"stopped": None, "attempts": 0})

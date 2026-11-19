@@ -9,7 +9,9 @@ coordinator  (LlmAgent)      -> delegates, decides when an issue is done
 from typing import Any
 
 from google.adk.agents import LlmAgent, LoopAgent
+from google.adk.models import Gemini
 from google.adk.tools.exit_loop_tool import exit_loop
+from google.genai import types
 
 from .config import Settings, get_settings
 from .tools import fetch_issue_tool, run_reproduction_tool, search_code_tool
@@ -44,6 +46,22 @@ Finish with a short report for the maintainer: classification, the test (if any)
 and what is still uncertain. Never claim a reproduction the tool did not report."""
 
 
+RETRY_STATUS_CODES = [429, 500, 503, 504]
+
+
+def gemini(model: str, settings: Settings) -> Gemini:
+    """A Gemini model that backs off and retries when the API is overloaded or rate-limited."""
+    retry = types.HttpRetryOptions(
+        attempts=settings.model_retry_attempts,
+        initial_delay=2.0,
+        max_delay=60.0,
+        exp_base=2.0,
+        jitter=1.0,
+        http_status_codes=RETRY_STATUS_CODES,
+    )
+    return Gemini(model=model, retry_options=retry)
+
+
 def build_agents(settings: Settings | None = None, offline: bool = False) -> LlmAgent:
     """Return the root (coordinator) agent with its sub-agents attached.
 
@@ -56,7 +74,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Llm
     )
     retriever = LlmAgent(
         name="retriever",
-        model=s.worker_model,
+        model=gemini(s.worker_model, s),
         description="Reads the issue and finds the relevant code.",
         instruction=RETRIEVER_INSTRUCTION,
         tools=retriever_tools,
@@ -64,14 +82,14 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Llm
     )
     classifier = LlmAgent(
         name="classifier",
-        model=s.worker_model,
+        model=gemini(s.worker_model, s),
         description="Classifies the issue: bug, question, feature_request, duplicate, needs_info.",
         instruction=CLASSIFIER_INSTRUCTION,
         output_key="issue_class",
     )
     reproducer = LlmAgent(
         name="reproducer",
-        model=s.worker_model,
+        model=gemini(s.worker_model, s),
         description="Writes and runs a minimal failing test for the bug.",
         instruction=REPRODUCER_INSTRUCTION,
         tools=[run_reproduction_tool],
@@ -79,7 +97,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Llm
     )
     verifier = LlmAgent(
         name="verifier",
-        model=s.worker_model,
+        model=gemini(s.worker_model, s),
         description="Critiques the reproduction and ends the loop once it is genuine.",
         instruction=VERIFIER_INSTRUCTION,
         tools=[exit_loop],
@@ -93,7 +111,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Llm
     )
     return LlmAgent(
         name="coordinator",
-        model=s.coordinator_model,
+        model=gemini(s.coordinator_model, s),
         description="Turns one GitHub issue into a verified failing test.",
         instruction=COORDINATOR_INSTRUCTION,
         sub_agents=[retriever, classifier, repro_loop],

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     coordinator_model: str = "gemini-3.8-flash"
     worker_model: str = "gemini-3.8-flash"
 
+    # Retries with exponential backoff on overload / rate-limit / server errors (429, 5xx).
+    model_retry_attempts: int = 6
+
     # Only checkouts under this directory may be searched or have tests run in them.
     workspace_root: str = "workspace"
     # A reproduction must fail on every one of these runs to count (flakiness guard).

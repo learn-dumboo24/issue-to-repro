@@ -30,9 +30,10 @@ class Summary:
 
 
 def load_results(path: str | Path) -> list[dict[str, Any]]:
-    return [
-        json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line
-    ]
+    """Read results, keeping the latest row per case (resumed runs append retried cases)."""
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    rows = [json.loads(line) for line in lines if line]
+    return list({row["case_id"]: row for row in rows}.values())
 
 
 def summarize(results: list[dict[str, Any]]) -> Summary:

@@ -15,6 +15,13 @@ def test_hierarchy():
 
 def test_models_and_loop_limit_are_configurable():
     root = build_agents(Settings(coordinator_model="c", worker_model="w", max_repro_attempts=2))
-    assert root.model == "c"
-    assert root.sub_agents[0].model == "w"
+    assert root.model.model == "c"
+    assert root.sub_agents[0].model.model == "w"
     assert root.sub_agents[2].max_iterations == 2
+
+
+def test_models_retry_on_overload():
+    root = build_agents(Settings(model_retry_attempts=3))
+    retry = root.model.retry_options
+    assert retry.attempts == 3
+    assert 503 in retry.http_status_codes and 429 in retry.http_status_codes

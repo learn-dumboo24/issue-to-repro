@@ -48,3 +48,12 @@ def test_markdown(tmp_path):
     assert "**Verified reproductions: 1/4 (25%)**" in md
     assert "| o/r#1 | reproduced | ✅ |" in md and "| o/r#2 | reproduced | ❌ |" in md
     assert "llm_call_limit" in md and "boom" in md
+
+
+def test_load_results_keeps_latest_row_per_case(tmp_path):
+    path = tmp_path / "r.jsonl"
+    retry = result("o/r#3", "reproduced", True, 10, 1)
+    path.write_text("".join(json.dumps(r) + "\n" for r in [*RESULTS, retry]))
+    loaded = load_results(path)
+    assert len(loaded) == 4
+    assert next(r for r in loaded if r["case_id"] == "o/r#3")["verdict"] == "reproduced"
