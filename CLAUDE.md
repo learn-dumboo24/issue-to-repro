@@ -7,7 +7,7 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - Lint: `uv run ruff check .` (format: `uv run ruff format .`)
 - Type check: `uv run mypy` (strict, on `src/`)
 - Test: `uv run pytest -q`
-- Dry run: `uv run issue-to-repro owner/name#1 --checkout workspace/name --dry-run`
+- Dry run: `uv run issue-to-repro reproduce owner/name#1 --checkout workspace/name --dry-run`
 
 ## Gates before every commit
 1. `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest -q`

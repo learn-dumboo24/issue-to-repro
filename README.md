@@ -45,7 +45,7 @@ that it fails for the reason the issue describes.
 ```bash
 uv sync
 uv run pytest               # never calls Gemini or the network
-uv run issue-to-repro owner/name#123 --checkout workspace/name --dry-run
+uv run issue-to-repro reproduce owner/name#123 --checkout workspace/name --dry-run
 ```
 
 To run the agents for real, set Gemini credentials (see `.env.example`), clone the target repo
