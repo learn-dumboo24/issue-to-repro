@@ -31,7 +31,8 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
   Cloud Run sandbox before touching untrusted repos.
 - **Secrets** come from env vars or Secret Manager. Never commit `.env` or key files.
 - **Public repositories and public data only.**
-- Gemini model ids live in `config.py`; check current ids before changing them.
+- Gemini model ids live in `config.py`; check current ids before changing them (list them with
+  `client.models.list()`). Retired ids return 404 "no longer available to new users".
 - ADK warns `LoopAgent` is deprecated for `Workflow`, but a `Workflow` cannot yet be an
   `LlmAgent` sub-agent. Keep `LoopAgent` until ADK allows that, then migrate `repro_loop`.
 

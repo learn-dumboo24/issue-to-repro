@@ -14,8 +14,10 @@ class Settings(BaseSettings):
     google_cloud_location: str = "us-central1"
 
     # Model ids are configurable so they can follow Gemini releases without code changes.
-    coordinator_model: str = "gemini-2.5-pro"
-    worker_model: str = "gemini-2.5-flash"
+    # Flash for both: gemini-2.5-* is closed to new users, and Pro models have no free-tier
+    # quota. Set COORDINATOR_MODEL to a Pro model once billing is enabled.
+    coordinator_model: str = "gemini-3.8-flash"
+    worker_model: str = "gemini-3.8-flash"
 
     # Only checkouts under this directory may be searched or have tests run in them.
     workspace_root: str = "workspace"
