@@ -96,8 +96,14 @@ def run_reproduction(repo_dir: str, test_relpath: str, test_code: str) -> dict[s
     }
 
 
+def _python_for(root: Path) -> str:
+    """Prefer the checkout's own virtualenv (see backtest.checkout); else this interpreter."""
+    venv_python = root / ".venv" / "bin" / "python"
+    return str(venv_python) if venv_python.exists() else sys.executable
+
+
 def _run_once(root: Path, target: Path, timeout_s: int) -> tuple[RunOutcome, str]:
-    command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(target)]
+    command = [_python_for(root), "-m", "pytest", "-q", "-p", "no:cacheprovider", str(target)]
     try:
         # check=False: a failing test is an expected outcome, classified below.
         done = subprocess.run(
