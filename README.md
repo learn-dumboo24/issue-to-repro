@@ -54,6 +54,30 @@ under `workspace/`, and drop `--dry-run`. `uv run adk web src` opens the ADK dev
 > **Security:** until the Cloud Run sandbox lands, reproductions execute the target repo's code
 > on your machine. Only use trusted repositories.
 
+## Backtesting
+
+How well does it work? The backtest replays bugs that were already fixed and checks the
+agents' tests against the real fix:
+
+1. **Dataset** (`datasets/`): `issue-to-repro dataset build` mines commits that close exactly one
+   issue and change both source and tests, and freezes each issue's title and body (comments
+   are left out because they often reveal the fix). CI builds datasets from `datasets/sources.json`.
+2. **Run**: for each case, a git worktree at the buggy commit gets its own virtualenv; the agents
+   see only the frozen issue text and the checkout.
+3. **Score**: a case is a *verified reproduction* only if the agents' test fails on the buggy
+   commit **and passes once the real fix is applied**. The verdict comes from the sandbox, never
+   from model text.
+
+```bash
+git clone --filter=blob:none https://github.com/pallets/click workspace/_sources/click
+uv run issue-to-repro backtest run --dataset datasets/click.jsonl \
+  --source workspace/_sources/click --out results/click.jsonl --limit 10
+uv run issue-to-repro backtest report --results results/click.jsonl --title "Click backtest"
+```
+
+Runs are capped per case (`BACKTEST_MAX_LLM_CALLS`, `BACKTEST_MAX_TOKENS`), append to the results
+file, and resume where they stopped.
+
 ## Roadmap
 
 Built in phases; each phase lands as one pull request and a tagged release
