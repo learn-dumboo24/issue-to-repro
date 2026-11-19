@@ -130,11 +130,12 @@ def test_prompt_contains_frozen_issue_text_as_data():
 def test_offline_agents_cannot_fetch_issues():
     retriever = build_agents(Settings(), offline=True).sub_agents[0]
     names = [getattr(t, "__name__", "") for t in retriever.tools]
-    assert names == ["search_code_tool"]
+    assert names == ["search_code_tool", "read_file_tool"]
     online = build_agents(Settings()).sub_agents[0]
     assert [getattr(t, "__name__", "") for t in online.tools] == [
         "fetch_issue_tool",
         "search_code_tool",
+        "read_file_tool",
     ]
 
 

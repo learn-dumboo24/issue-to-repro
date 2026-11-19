@@ -5,8 +5,8 @@ import urllib.request
 
 import pytest
 
-from issue_to_repro.tools import fetch_issue_tool, search_code_tool
-from issue_to_repro.tools.code_search import search_code
+from issue_to_repro.tools import fetch_issue_tool, read_file_tool, search_code_tool
+from issue_to_repro.tools.code_search import read_file, search_code
 from issue_to_repro.tools.github import fetch_issue, parse_issue
 
 
@@ -116,3 +116,29 @@ def test_search_stops_at_max_results(workspace):
 def test_checkout_must_be_a_directory(workspace):
     with pytest.raises(ValueError, match="not a directory"):
         search_code(str(workspace / "README.md"), "add")
+
+
+def test_read_file_returns_numbered_lines(workspace):
+    assert read_file(str(workspace), "demo/__init__.py") == (
+        "    1  def add(a, b):\n    2      return a - b  # bug"
+    )
+    assert read_file(str(workspace), "demo/__init__.py", 2, 2) == "    2      return a - b  # bug"
+
+
+def test_read_file_caps_lines_and_says_where_to_continue(workspace):
+    (workspace / "big.py").write_text("".join(f"line{n}\n" for n in range(1, 501)))
+    text = read_file(str(workspace), "big.py", 10)
+    assert text.splitlines()[0] == "   10  line10"
+    assert text.splitlines()[-1] == "... (500 lines in total; read on from 210)"
+
+
+@pytest.mark.parametrize("path", ["../outside.py", "demo", "missing.py"])
+def test_read_file_rejects_paths_outside_or_missing(workspace, path):
+    with pytest.raises(ValueError):
+        read_file(str(workspace), path)
+
+
+def test_read_file_tool_wraps_errors(workspace):
+    assert read_file_tool(str(workspace), "demo/__init__.py")["status"] == "ok"
+    assert read_file_tool(str(workspace), "x.py", start_line=0)["status"] == "error"
+    assert read_file_tool(str(workspace), "demo/__init__.py", start_line=0)["status"] == "error"

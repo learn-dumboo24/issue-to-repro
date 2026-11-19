@@ -40,3 +40,25 @@ def _iter_files(root: Path) -> Iterator[Path]:
             and not SKIPPED_DIRS.intersection(path.relative_to(root).parts)
         ):
             yield path
+
+
+MAX_READ_LINES = 200
+
+
+def read_file(repo_dir: str, path: str, start_line: int = 1, end_line: int | None = None) -> str:
+    """Return lines [start_line, end_line] of a checkout file, numbered, at most 200 lines."""
+    root = resolve_checkout(repo_dir)
+    target = (root / path).resolve()
+    if root not in target.parents or not target.is_file():
+        raise ValueError(f"{path!r} is not a file inside the checkout")
+    if start_line < 1:
+        raise ValueError("start_line must be >= 1")
+    lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+    last = min(len(lines), end_line or len(lines), start_line + MAX_READ_LINES - 1)
+    numbered = [f"{n:>5}  {lines[n - 1]}" for n in range(start_line, last + 1)]
+    footer = (
+        []
+        if last >= len(lines)
+        else [f"... ({len(lines)} lines in total; read on from {last + 1})"]
+    )
+    return "\n".join(numbered + footer)
