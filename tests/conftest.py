@@ -1,5 +1,15 @@
 import pytest
 
+from issue_to_repro.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(tmp_path, monkeypatch):
+    """Keep tests independent of the machine: no stray env vars, no local .env file."""
+    for name in Settings.model_fields:
+        monkeypatch.delenv(name.upper(), raising=False)
+    monkeypatch.chdir(tmp_path)
+
 
 @pytest.fixture
 def workspace(tmp_path, monkeypatch):

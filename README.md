@@ -1,5 +1,8 @@
 # issue-to-repro
 
+[![CI](https://github.com/learn-dumboo24/issue-to-repro/actions/workflows/ci.yml/badge.svg)](https://github.com/learn-dumboo24/issue-to-repro/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 **Turns GitHub bug reports into verified failing tests, so maintainers stop spending their
 time reproducing issues.**
 
@@ -41,7 +44,7 @@ that it fails for the reason the issue describes.
 
 ```bash
 uv sync
-uv run pytest
+uv run pytest               # never calls Gemini or the network
 uv run issue-to-repro owner/name#123 --checkout workspace/name --dry-run
 ```
 
@@ -53,14 +56,22 @@ under `workspace/`, and drop `--dry-run`. `uv run adk web src` opens the ADK dev
 
 ## Roadmap
 
-- [x] ADK agent hierarchy with a reproducer/verifier self-reflection loop
-- [x] Reproduction runner with invalid/flaky detection, keyword code search, GitHub issue reader
-- [ ] Backtest harness: replay closed issues that have a linked fix, measure reproduction rate
-- [ ] Vector retrieval over code, docs, closed issues and commits (Vertex AI)
-- [ ] Docker / Cloud Run job sandbox; per-repo dependency setup
-- [ ] Cloud Run webhook service + comment-only GitHub App with maintainer approval
-- [ ] Tracing and metrics dashboard: reproduction rate, cost per issue, p50/p95 latency
-- [ ] Shadow-mode report for 2–3 open-source projects, then opt-in live runs
-- [ ] Export fixed issues as verified fail-to-pass benchmark tasks
+Built in phases; each phase lands as one pull request and a tagged release
+(see [CHANGELOG.md](CHANGELOG.md)).
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1. Foundation | Agents, verified reproduction runner, CI, typing, coverage gate | ✅ v0.1.0 |
+| 2. Backtest harness | Replay closed issues with a linked fix; measure reproduction rate | Next |
+| 3. Sandbox | Run reproductions in Docker, then Cloud Run jobs | Planned |
+| 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Planned |
+| 5. Observability | ADK OpenTelemetry → Cloud Trace; cost and latency per issue | Planned |
+| 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval | Planned |
+| 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
+| 8. Benchmarks | Export fixed issues as verified fail-to-pass agent benchmark tasks | Planned |
 
 Public repositories only.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

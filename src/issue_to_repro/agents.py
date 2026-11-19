@@ -7,7 +7,7 @@ coordinator  (LlmAgent)      -> delegates, decides when an issue is done
 """
 
 from google.adk.agents import LlmAgent, LoopAgent
-from google.adk.tools import exit_loop
+from google.adk.tools.exit_loop_tool import exit_loop
 
 from .config import Settings, get_settings
 from .tools import fetch_issue_tool, run_reproduction_tool, search_code_tool

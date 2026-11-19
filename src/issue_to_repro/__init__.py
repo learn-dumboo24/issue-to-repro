@@ -3,6 +3,10 @@
 import argparse
 import asyncio
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.adk.agents import BaseAgent
 
 ISSUE_REF = re.compile(r"^(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(?P<number>\d+)$")
 
@@ -30,7 +34,7 @@ def main() -> None:
     asyncio.run(_run(root, match["repo"], int(match["number"]), args.checkout))
 
 
-async def _run(root, repo: str, number: int, checkout: str) -> None:
+async def _run(root: "BaseAgent", repo: str, number: int, checkout: str) -> None:
     from google.adk.runners import InMemoryRunner
     from google.genai import types
 

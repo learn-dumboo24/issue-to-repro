@@ -3,13 +3,15 @@
 Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is Cloud Run.
 
 ## Commands
-- Install: `uv sync`
+- Install: `uv sync`, then `uv run pre-commit install` (ruff + safety hooks on every commit)
 - Lint: `uv run ruff check .` (format: `uv run ruff format .`)
+- Type check: `uv run mypy` (strict, on `src/`)
 - Test: `uv run pytest -q`
 - Dry run: `uv run issue-to-repro owner/name#1 --checkout workspace/name --dry-run`
 
 ## Gates before every commit
-1. `uv run ruff check .` and `uv run pytest -q` both pass. Never commit red.
+1. `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest -q`
+   all pass (CI runs the same four). Never commit red.
 2. New behaviour comes with a test. Tools must be testable without network or Gemini:
    put logic in plain functions, keep the ADK wrappers in `tools/__init__.py` thin.
 3. Never report a reproduction the runner did not produce. The verdict comes from

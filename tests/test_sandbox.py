@@ -71,3 +71,12 @@ def test_combine():
     assert combine([F, RunOutcome.TIMEOUT]) is Verdict.ERROR
     with pytest.raises(ValueError):
         combine([])
+
+
+def test_timeout_is_an_error_not_a_reproduction(workspace, monkeypatch):
+    monkeypatch.setenv("TEST_TIMEOUT_S", "1")
+    slow = "import time\n\ndef test_slow():\n    time.sleep(10)\n"
+    result = run_reproduction(str(workspace), "test_issue_repro_3.py", slow)
+    assert result["verdict"] == "error"
+    assert result["runs"] == ["timeout"]
+    assert "timed out after 1s" in result["last_output_tail"]

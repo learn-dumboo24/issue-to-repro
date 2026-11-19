@@ -1,6 +1,8 @@
 """Keyword search over a checkout: the baseline the vector index (RAG) will be measured against."""
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 from .workspace import resolve_checkout
 
@@ -8,13 +10,13 @@ SEARCHED_SUFFIXES = {".py", ".pyi", ".md", ".rst", ".txt", ".toml", ".cfg", ".in
 SKIPPED_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".tox", "build", "dist"}
 
 
-def search_code(repo_dir: str, query: str, max_results: int = 20) -> list[dict]:
+def search_code(repo_dir: str, query: str, max_results: int = 20) -> list[dict[str, Any]]:
     """Case-insensitive substring search. Returns [{"path", "line", "text"}], repo-relative."""
     if not query.strip():
         raise ValueError("query must not be empty")
     root = resolve_checkout(repo_dir)
     needle = query.lower()
-    hits: list[dict] = []
+    hits: list[dict[str, Any]] = []
     for path in sorted(_iter_files(root)):
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
@@ -30,7 +32,7 @@ def search_code(repo_dir: str, query: str, max_results: int = 20) -> list[dict]:
     return hits
 
 
-def _iter_files(root: Path):
+def _iter_files(root: Path) -> Iterator[Path]:
     for path in root.rglob("*"):
         if (
             path.is_file()
