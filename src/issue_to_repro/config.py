@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Reproducer <-> verifier rounds before giving up on an issue.
     max_repro_attempts: int = 4
 
+    # Hard per-case limits for backtests (Google Cloud billing has no automatic spending cap).
+    backtest_max_llm_calls: int = 40
+    backtest_max_tokens: int = 400_000
+
     # Optional; raises GitHub's API rate limit. Public issues work without it.
     github_token: SecretStr | None = None
 
