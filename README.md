@@ -18,17 +18,18 @@ task, so the project doubles as a generator of real-world evals for coding agent
 ## Architecture
 
 ```
-coordinator (ADK LlmAgent, Gemini)
+coordinator (ADK SequentialAgent: fixed order)
 ├── retriever   reads the issue, searches the code      tools: fetch_issue, search_code
 ├── classifier  bug / question / feature / duplicate / needs-info
-└── repro_loop  (ADK LoopAgent: self-reflection)
-    ├── reproducer  writes + runs a failing test        tool: run_reproduction
-    └── verifier    accepts only genuine reproductions  tool: exit_loop
+├── repro_loop  (ADK LoopAgent: self-reflection)
+│   ├── reproducer  writes + runs a failing test        tools: run_reproduction, exit_loop
+│   └── verifier    accepts only genuine reproductions  tool: exit_loop
+└── reporter    short report for the maintainer
 ```
 
 | Piece | Google stack |
 |---|---|
-| Multi-agent, hierarchical delegation, self-reflection loop | Agent Development Kit (ADK) + Gemini |
+| Multi-agent pipeline with hierarchical delegation and a self-reflection loop | Agent Development Kit (ADK) + Gemini |
 | Retrieval over code, docs, closed issues, commits | keyword baseline now → Vertex AI embeddings + vector search |
 | Sandboxed test runs | local runner now → Cloud Run jobs |
 | GitHub webhook service | Cloud Run |

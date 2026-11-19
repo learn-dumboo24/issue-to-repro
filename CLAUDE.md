@@ -40,8 +40,10 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - **Public repositories and public data only.**
 - Gemini model ids live in `config.py`; check current ids before changing them (list them with
   `client.models.list()`). Retired ids return 404 "no longer available to new users".
-- ADK warns `LoopAgent` is deprecated for `Workflow`, but a `Workflow` cannot yet be an
-  `LlmAgent` sub-agent. Keep `LoopAgent` until ADK allows that, then migrate `repro_loop`.
+- ADK warns `SequentialAgent` and `LoopAgent` are deprecated for `Workflow`. They work today;
+  migrating `coordinator` and `repro_loop` to `Workflow` is a planned, separate change.
+- The pipeline order is fixed on purpose. Model-driven `transfer_to_agent` hand-offs failed in
+  live runs (ended after classification, or looped to the call limit). Don't reintroduce them.
 
 ## Review agents
 `.claude/agents/` has four reviewers copied unchanged from ECC (github.com/affaan-m/ECC @ 3f14a10,

@@ -212,7 +212,7 @@ async def _run_agents_adk(prompt: str, settings: Settings) -> AgentRun:  # pragm
             calls = [(c.name or "?", dict(c.args or {})) for c in event.get_function_calls()]
             if calls or text:
                 run.trace.append(trace_line(event.author, calls, text))
-            if event.author == "coordinator" and text:
+            if event.author == "reporter" and text:
                 run.final_text = text
             if run.prompt_tokens + run.output_tokens > settings.backtest_max_tokens:
                 run.stopped = "token_budget"
