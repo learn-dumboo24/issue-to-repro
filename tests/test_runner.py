@@ -63,6 +63,7 @@ def test_verified_fail_to_pass(setup):
     assert result.attempts == 1  # the tool error is not counted as an attempt
     assert result.test_code == FIXED_BEHAVIOUR
     assert (result.llm_calls, result.prompt_tokens, result.output_tokens) == (3, 100, 20)
+    assert result.models == "gemini-3.8-flash/gemini-3.8-flash"
     assert json.loads(out.read_text())["case_id"] == "o/proj#12"
 
 

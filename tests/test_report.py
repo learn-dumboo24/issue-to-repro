@@ -19,7 +19,7 @@ def result(case: str, verdict: str, f2p, tokens: int, latency: float, **extra) -
 
 
 RESULTS = [
-    result("o/r#1", "reproduced", True, 1000, 10),
+    result("o/r#1", "reproduced", True, 1000, 10, models="m1/m2"),
     result("o/r#2", "reproduced", False, 3000, 30),
     result("o/r#3", "no_attempt", None, 500, 5, stopped="llm_call_limit"),
     result("o/r#4", "setup_error", None, 0, 1, error="boom"),
@@ -48,6 +48,7 @@ def test_markdown(tmp_path):
     assert "**Verified reproductions: 1/4 (25%)**" in md
     assert "| o/r#1 | reproduced | ✅ |" in md and "| o/r#2 | reproduced | ❌ |" in md
     assert "llm_call_limit" in md and "boom" in md
+    assert "| Models (coordinator/worker) | m1/m2 |" in md
 
 
 def test_load_results_keeps_latest_row_per_case(tmp_path):

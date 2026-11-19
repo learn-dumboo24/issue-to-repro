@@ -51,6 +51,7 @@ class CaseResult:
     stopped: str | None
     final_report: str
     error: str | None = None
+    models: str = ""  # "coordinator/worker" model ids, so runs on different models stay apart
 
 
 RunAgents = Callable[[Case, Path, Settings], AgentRun]
@@ -101,6 +102,7 @@ def run_case(case: Case, prepare: Prepare, run_agents: RunAgents, settings: Sett
         latency_s=round(time.monotonic() - started, 1),
         stopped=run.stopped,
         final_report=run.final_text[:MAX_REPORT_CHARS],
+        models=f"{settings.coordinator_model}/{settings.worker_model}",
     )
 
 

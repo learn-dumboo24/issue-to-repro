@@ -18,6 +18,7 @@ class Summary:
     tokens_per_case: float
     latency_p50_s: float
     latency_p95_s: float
+    models: frozenset[str] = frozenset()
 
     @property
     def verified_rate(self) -> float:
@@ -48,6 +49,7 @@ def summarize(results: list[dict[str, Any]]) -> Summary:
         tokens_per_case=statistics.fmean(tokens) if tokens else 0.0,
         latency_p50_s=_percentile(latencies, 50),
         latency_p95_s=_percentile(latencies, 95),
+        models=frozenset(r["models"] for r in results if r.get("models")),
     )
 
 
@@ -63,6 +65,7 @@ def render_markdown(results: list[dict[str, Any]], title: str) -> str:
         "",
         "| Metric | Value |",
         "|---|---|",
+        f"| Models (coordinator/worker) | {', '.join(sorted(s.models)) or 'n/a'} |",
         f"| Cases | {s.cases} |",
         f'| Sandbox said "reproduced" | {s.reproduced} |',
         f"| ...confirmed by the real fix (precision) | {s.verified} ({s.precision:.0%}) |",
