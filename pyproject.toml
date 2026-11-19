@@ -3,6 +3,8 @@ name = "issue-to-repro"
 version = "0.1.0"
 description = "Turns GitHub bug reports into verified failing tests for maintainers. ADK + Gemini + Cloud Run."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "google-adk>=2.14.1",

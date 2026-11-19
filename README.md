@@ -64,3 +64,7 @@ under `workspace/`, and drop `--dry-run`. `uv run adk web src` opens the ADK dev
 - [ ] Export fixed issues as verified fail-to-pass benchmark tasks
 
 Public repositories only.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
