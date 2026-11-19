@@ -13,6 +13,7 @@ from issue_to_repro.backtest.runner import (
     check_against_fix,
     is_retryable,
     run_backtest,
+    trace_line,
 )
 from issue_to_repro.config import Settings
 from issue_to_repro.tools.sandbox import rerun_test, run_reproduction
@@ -157,3 +158,20 @@ def test_is_retryable():
     assert not is_retryable({"stopped": "api_error 400: bad request", "attempts": 0})
     assert not is_retryable({"stopped": "api_error 503: x", "attempts": 2})
     assert not is_retryable({"stopped": None, "attempts": 0})
+
+
+def test_trace_line_is_compact_and_hides_test_code():
+    line = trace_line(
+        "reproducer",
+        [
+            (
+                "run_reproduction_tool",
+                {"test_relpath": "test_issue_repro_1.py", "test_code": "x" * 500},
+            )
+        ],
+        "Running   the\n test",
+    )
+    assert line == (
+        "[reproducer] run_reproduction_tool(test_relpath='test_issue_repro_1.py') Running the test"
+    )
+    assert len(trace_line("a", [], "y" * 1000)) <= 240

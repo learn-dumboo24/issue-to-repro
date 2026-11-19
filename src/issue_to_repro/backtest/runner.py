@@ -20,6 +20,8 @@ from .checkout import prepare_checkout
 from .dataset import Case
 
 MAX_REPORT_CHARS = 4_000
+MAX_TRACE_STEPS = 300
+MAX_TRACE_LINE = 240
 
 
 @dataclass
@@ -32,6 +34,7 @@ class AgentRun:
     repro_results: list[dict[str, Any]] = field(default_factory=list)  # run_reproduction results
     final_text: str = ""
     stopped: str | None = None  # why the run ended early, if it did
+    trace: list[str] = field(default_factory=list)  # one compact line per agent step
 
 
 @dataclass
@@ -52,6 +55,7 @@ class CaseResult:
     final_report: str
     error: str | None = None
     models: str = ""  # "coordinator/worker" model ids, so runs on different models stay apart
+    trace: list[str] = field(default_factory=list)
 
 
 RunAgents = Callable[[Case, Path, Settings], AgentRun]
@@ -103,7 +107,19 @@ def run_case(case: Case, prepare: Prepare, run_agents: RunAgents, settings: Sett
         stopped=run.stopped,
         final_report=run.final_text[:MAX_REPORT_CHARS],
         models=f"{settings.coordinator_model}/{settings.worker_model}",
+        trace=run.trace[:MAX_TRACE_STEPS],
     )
+
+
+def trace_line(author: str, calls: list[tuple[str, dict[str, Any]]], text: str) -> str:
+    """Summarise one agent step: who acted, which tools it called (with short args), what it said."""
+    parts = [f"[{author}]"]
+    for name, args in calls:
+        shown = ", ".join(f"{k}={str(v)[:40]!r}" for k, v in args.items() if k != "test_code")
+        parts.append(f"{name}({shown})")
+    if text:
+        parts.append(" ".join(text.split())[:120])
+    return " ".join(parts)[:MAX_TRACE_LINE]
 
 
 def check_against_fix(checkout: Path, case: Case, test_path: str) -> list[str]:
@@ -190,10 +206,14 @@ async def _run_agents_adk(prompt: str, settings: Settings) -> AgentRun:  # pragm
             for response in event.get_function_responses():
                 if response.name == "run_reproduction_tool" and response.response:
                     run.repro_results.append(dict(response.response))
-            if event.author == "coordinator" and event.content and event.content.parts:
+            text = ""
+            if event.content and event.content.parts:
                 text = "".join(part.text or "" for part in event.content.parts).strip()
-                if text:
-                    run.final_text = text
+            calls = [(c.name or "?", dict(c.args or {})) for c in event.get_function_calls()]
+            if calls or text:
+                run.trace.append(trace_line(event.author, calls, text))
+            if event.author == "coordinator" and text:
+                run.final_text = text
             if run.prompt_tokens + run.output_tokens > settings.backtest_max_tokens:
                 run.stopped = "token_budget"
                 break
