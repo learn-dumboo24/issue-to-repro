@@ -1,0 +1,40 @@
+name: Bug report
+description: issue-to-repro did something wrong (crash, wrong verdict, bad test)
+labels: [bug]
+body:
+  - type: input
+    id: issue
+    attributes:
+      label: Target issue
+      description: The GitHub issue you ran it on, as owner/name#123
+      placeholder: owner/name#123
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: What went wrong?
+      options:
+        - Wrong verdict (claimed a reproduction that isn't one, or missed a real one)
+        - Generated test is wrong or flaky
+        - Crash or error
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Command and output
+      description: The command you ran and its output. Remove any secrets.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or a commit SHA
