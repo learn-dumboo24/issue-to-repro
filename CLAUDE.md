@@ -3,7 +3,7 @@
 Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is Cloud Run.
 
 ## Commands
-- Install: `uv sync`
+- Install: `uv sync`, then `uv run pre-commit install` (ruff + safety hooks on every commit)
 - Lint: `uv run ruff check .` (format: `uv run ruff format .`)
 - Type check: `uv run mypy` (strict, on `src/`)
 - Test: `uv run pytest -q`
