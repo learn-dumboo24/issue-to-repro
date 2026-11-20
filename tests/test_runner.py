@@ -6,7 +6,6 @@ import pytest
 from test_checkout import make_case
 
 from issue_to_repro.agents import build_agents
-from issue_to_repro.backtest.checkout import prepare_checkout, run_checked
 from issue_to_repro.backtest.runner import (
     AgentRun,
     build_prompt,
@@ -22,26 +21,6 @@ FIXED_BEHAVIOUR = "from pkg.core import x\n\ndef test_x():\n    assert x == 2\n"
 NEVER_PASSES = "from pkg.core import x\n\ndef test_x():\n    assert x == 3\n"
 
 
-def git_only(command: list[str]) -> None:
-    if command[0] == "git":
-        run_checked(command)  # uv installs are skipped: tests run with this interpreter
-
-
-@pytest.fixture
-def setup(history, tmp_path, monkeypatch):
-    repo, base, fix = history
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    monkeypatch.setenv("WORKSPACE_ROOT", str(workspace))
-    monkeypatch.setenv("REPRO_RUNS", "2")
-    case = make_case(base, fix)
-
-    def prepare(c):
-        return prepare_checkout(repo, c, workspace, run=git_only)
-
-    return case, prepare, tmp_path / "results.jsonl"
-
-
 def agent_writing(code: str | None):
     def run_agents(case, checkout: Path, settings: Settings) -> AgentRun:
         run = AgentRun(llm_calls=3, prompt_tokens=100, output_tokens=20, final_text="done")
@@ -54,8 +33,8 @@ def agent_writing(code: str | None):
     return run_agents
 
 
-def test_verified_fail_to_pass(setup):
-    case, prepare, out = setup
+def test_verified_fail_to_pass(backtest_setup):
+    case, prepare, out = backtest_setup
     [result] = run_backtest(
         [case], out, prepare, agent_writing(FIXED_BEHAVIOUR), log=lambda m: None
     )
@@ -68,21 +47,21 @@ def test_verified_fail_to_pass(setup):
     assert json.loads(out.read_text())["case_id"] == "o/proj#12"
 
 
-def test_reproduction_that_the_fix_does_not_fix_is_not_verified(setup):
-    case, prepare, out = setup
+def test_reproduction_that_the_fix_does_not_fix_is_not_verified(backtest_setup):
+    case, prepare, out = backtest_setup
     [result] = run_backtest([case], out, prepare, agent_writing(NEVER_PASSES), log=lambda m: None)
     assert result.verdict == "reproduced"
     assert result.fail_to_pass is False and result.fix_runs == ["failed", "failed"]
 
 
-def test_no_attempt(setup):
-    case, prepare, out = setup
+def test_no_attempt(backtest_setup):
+    case, prepare, out = backtest_setup
     [result] = run_backtest([case], out, prepare, agent_writing(None), log=lambda m: None)
     assert (result.verdict, result.attempts, result.fail_to_pass) == ("no_attempt", 0, None)
 
 
-def test_setup_errors_are_recorded_not_raised(setup):
-    case, _, out = setup
+def test_setup_errors_are_recorded_not_raised(backtest_setup):
+    case, _, out = backtest_setup
 
     def broken(c):
         raise subprocess.CalledProcessError(1, ["git"], stderr="fatal: bad object")
@@ -92,8 +71,8 @@ def test_setup_errors_are_recorded_not_raised(setup):
     assert "fatal: bad object" in result.error
 
 
-def test_resume_skips_finished_cases(setup):
-    case, prepare, out = setup
+def test_resume_skips_finished_cases(backtest_setup):
+    case, prepare, out = backtest_setup
     messages: list[str] = []
     run_backtest([case], out, prepare, agent_writing(FIXED_BEHAVIOUR), log=messages.append)
     assert (
@@ -104,8 +83,8 @@ def test_resume_skips_finished_cases(setup):
     assert len(out.read_text().splitlines()) == 1
 
 
-def test_check_against_fix_restores_base_and_keeps_test(setup):
-    case, prepare, _ = setup
+def test_check_against_fix_restores_base_and_keeps_test(backtest_setup):
+    case, prepare, _ = backtest_setup
     checkout = prepare(case)
     run_reproduction(str(checkout), "test_issue_repro_12.py", FIXED_BEHAVIOUR)
     assert check_against_fix(checkout, case, "test_issue_repro_12.py") == ["passed", "passed"]
@@ -113,8 +92,8 @@ def test_check_against_fix_restores_base_and_keeps_test(setup):
     assert (checkout / "test_issue_repro_12.py").exists()
 
 
-def test_rerun_requires_an_existing_repro_file(setup):
-    case, prepare, _ = setup
+def test_rerun_requires_an_existing_repro_file(backtest_setup):
+    case, prepare, _ = backtest_setup
     checkout = prepare(case)
     with pytest.raises(ValueError, match="not an existing"):
         rerun_test(str(checkout), "test_issue_repro_missing.py")
@@ -139,8 +118,8 @@ def test_offline_agents_cannot_fetch_issues():
     ]
 
 
-def test_transient_api_errors_are_retried_on_resume(setup):
-    case, prepare, out = setup
+def test_transient_api_errors_are_retried_on_resume(backtest_setup):
+    case, prepare, out = backtest_setup
 
     def overloaded(case, checkout, settings):
         return AgentRun(stopped="api_error 503: high demand")

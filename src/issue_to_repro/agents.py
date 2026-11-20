@@ -88,6 +88,33 @@ def tool_budget(limit: int) -> ToolCallback:
     return callback
 
 
+def make_model(model: str, settings: Settings) -> Any:
+    """The ADK model object for `model` on the configured provider."""
+    if settings.model_provider == "anthropic":
+        return claude(model, settings)
+    return gemini(model, settings)
+
+
+def claude(model: str, settings: Settings) -> Any:
+    """Claude through ADK's AnthropicLlm and the official Anthropic SDK.
+
+    The client is built here so the base URL and key are explicit: the SDK (and a setting named
+    after it) would otherwise pick up ANTHROPIC_BASE_URL, which some sandboxes set for their own use.
+    """
+    from anthropic import AsyncAnthropic
+    from google.adk.models.anthropic_llm import AnthropicLlm
+
+    key = settings.anthropic_api_key
+    if key is None:
+        raise ValueError("MODEL_PROVIDER=anthropic needs ANTHROPIC_API_KEY")
+    client = AsyncAnthropic(
+        api_key=key.get_secret_value(),
+        base_url=settings.claude_api_base_url,
+        max_retries=settings.model_retry_attempts,
+    )
+    return AnthropicLlm(model=model, max_tokens=settings.anthropic_max_tokens, client=client)
+
+
 def gemini(model: str, settings: Settings) -> Gemini:
     """A Gemini model that backs off and retries when the API is overloaded or rate-limited."""
     retry = types.HttpRetryOptions(
@@ -115,7 +142,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Seq
     )
     retriever = LlmAgent(
         name="retriever",
-        model=gemini(s.worker_model, s),
+        model=make_model(s.worker_model, s),
         description="Reads the issue and finds the relevant code.",
         instruction=RETRIEVER_INSTRUCTION,
         tools=retriever_tools,
@@ -125,7 +152,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Seq
     )
     classifier = LlmAgent(
         name="classifier",
-        model=gemini(s.worker_model, s),
+        model=make_model(s.worker_model, s),
         description="Classifies the issue: bug, question, feature_request, duplicate, needs_info.",
         instruction=CLASSIFIER_INSTRUCTION,
         output_key="issue_class",
@@ -133,7 +160,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Seq
     )
     reproducer = LlmAgent(
         name="reproducer",
-        model=gemini(s.worker_model, s),
+        model=make_model(s.worker_model, s),
         description="Writes and runs a minimal failing test for the bug.",
         instruction=REPRODUCER_INSTRUCTION,
         tools=[read_file_tool, run_reproduction_tool, exit_loop],
@@ -142,7 +169,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Seq
     )
     verifier = LlmAgent(
         name="verifier",
-        model=gemini(s.coordinator_model, s),
+        model=make_model(s.coordinator_model, s),
         description="Critiques the reproduction and ends the loop once it is genuine.",
         instruction=VERIFIER_INSTRUCTION,
         tools=[exit_loop],
@@ -157,7 +184,7 @@ def build_agents(settings: Settings | None = None, offline: bool = False) -> Seq
     )
     reporter = LlmAgent(
         name="reporter",
-        model=gemini(s.coordinator_model, s),
+        model=make_model(s.coordinator_model, s),
         description="Summarises the outcome for the maintainer.",
         instruction=REPORTER_INSTRUCTION,
         **NO_TRANSFERS,

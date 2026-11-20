@@ -15,7 +15,16 @@ class Settings(BaseSettings):
     google_cloud_project: str | None = None
     google_cloud_location: str = "us-central1"
 
-    # Model ids are configurable so they can follow Gemini releases without code changes.
+    # Which API serves the agents. "anthropic" uses ADK's AnthropicLlm (official Anthropic SDK);
+    # set COORDINATOR_MODEL / WORKER_MODEL to Claude ids (e.g. claude-haiku-5-5) with it.
+    model_provider: Literal["gemini", "anthropic"] = "gemini"
+    # Deliberately not named anthropic_base_url: settings read same-named env vars, and some
+    # sandboxes set ANTHROPIC_BASE_URL for their own use, which would redirect our calls.
+    claude_api_base_url: str = "https://api.anthropic.com"
+    anthropic_api_key: SecretStr | None = None
+    anthropic_max_tokens: int = 16_000
+
+    # Model ids are configurable so they can follow model releases without code changes.
     # Flash for both: gemini-2.5-* is closed to new users, and Pro models have no free-tier
     # quota. Set COORDINATOR_MODEL to a Pro model once billing is enabled.
     coordinator_model: str = "gemini-3.8-flash"
@@ -54,6 +63,9 @@ class Settings(BaseSettings):
     # Hard per-case limits for backtests (Google Cloud billing has no automatic spending cap).
     backtest_max_llm_calls: int = 40
     backtest_max_tokens: int = 400_000
+    # Run-wide spend cap in US dollars, estimated from token counts and backtest/pricing.py.
+    # A case only starts if its worst-case cost still fits under the cap.
+    backtest_max_usd: float | None = None
 
     # Optional; raises GitHub's API rate limit. Public issues work without it.
     github_token: SecretStr | None = None
