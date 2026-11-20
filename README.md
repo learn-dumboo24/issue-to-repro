@@ -33,7 +33,7 @@ coordinator (ADK SequentialAgent: fixed order)
 | Retrieval over code, docs, closed issues, commits | keyword baseline now → Vertex AI embeddings + vector search |
 | Sandboxed test runs | Docker: no network, non-root, read-only (`SANDBOX=docker`) → Cloud Run jobs |
 | GitHub webhook service | Cloud Run |
-| Tracing and LLM metrics (cost per issue, latency, tokens/sec) | ADK OpenTelemetry → Cloud Trace, BigQuery |
+| Tracing and LLM metrics (cost per verified fix, latency, tokens per agent) | ADK OpenTelemetry → JSON-lines spans + dashboard now; Cloud Trace on Cloud Run |
 
 **How a reproduction is verified** (`src/issue_to_repro/tools/sandbox.py`): the test runs
 `REPRO_RUNS` times (default 3). Import errors, missing fixtures, collection errors and
@@ -97,6 +97,23 @@ uv run issue-to-repro backtest report --results results/click.jsonl --title "Cli
 Runs are capped per case (`BACKTEST_MAX_LLM_CALLS`, `BACKTEST_MAX_TOKENS`) and per run
 (`BACKTEST_MAX_USD`, an upper-bound estimate from published prices), append to the results file,
 and resume where they stopped.
+
+### Tracing and dashboard
+
+`backtest run --trace spans.jsonl` records OpenTelemetry spans (ADK's agent, model and tool spans
+plus each case's prepare / agents / fix-check stages). `trace report --trace spans.jsonl` breaks
+them down per agent and per stage. **[Dashboard](docs/index.html)** (all runs side by side):
+
+```bash
+uv run issue-to-repro dashboard \
+  --run "Gemini 3.1 Flash-Lite=results/click-flash-lite-budget.jsonl" \
+  --run "Claude Haiku 5.5=results/click-haiku.jsonl" \
+  --run "Claude Haiku 5.5 + semantic search=results/click-haiku-semantic.jsonl" \
+  --retrieval results/retrieval-click.jsonl \
+  --trace results/traces/click-3362-flash-lite.jsonl --out docs/index.html
+```
+
+To host it, enable GitHub Pages for the `docs/` folder on `main` (Settings → Pages).
 
 ### Models and retrieval
 
