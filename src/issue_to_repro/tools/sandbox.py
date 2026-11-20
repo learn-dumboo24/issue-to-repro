@@ -7,12 +7,19 @@ Cloud Run job sandbox lands, only point it at repositories you trust.
 import os
 import re
 import subprocess
-import sys
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from ..config import get_settings
+from .isolation import (
+    HOST_TIMEOUT_GRACE_S,
+    TIMEOUT_EXIT_CODES,
+    checkout_python,
+    container_name,
+    docker_command,
+    pytest_command,
+)
 from .workspace import resolve_checkout
 
 TEST_NAME = re.compile(r"^test_issue_repro[A-Za-z0-9_]*\.py$")
@@ -111,14 +118,16 @@ def _run_repeatedly(root: Path, target: Path) -> dict[str, Any]:
     }
 
 
-def _python_for(root: Path) -> str:
-    """Prefer the checkout's own virtualenv (see backtest.checkout); else this interpreter."""
-    venv_python = root / ".venv" / "bin" / "python"
-    return str(venv_python) if venv_python.exists() else sys.executable
-
-
 def _run_once(root: Path, target: Path, timeout_s: int) -> tuple[RunOutcome, str]:
-    command = [_python_for(root), "-m", "pytest", "-q", "-p", "no:cacheprovider", str(target)]
+    settings = get_settings()
+    if settings.sandbox == "docker":
+        name = container_name()
+        command = docker_command(root, target, settings, name, timeout_s)
+        host_timeout = timeout_s + HOST_TIMEOUT_GRACE_S
+    else:
+        name = None
+        command = pytest_command(checkout_python(root), target)
+        host_timeout = timeout_s
     try:
         # check=False: a failing test is an expected outcome, classified below.
         done = subprocess.run(
@@ -127,7 +136,7 @@ def _run_once(root: Path, target: Path, timeout_s: int) -> tuple[RunOutcome, str
             cwd=root,
             capture_output=True,
             text=True,
-            timeout=timeout_s,
+            timeout=host_timeout,
             # No bytecode cache: after the fix is applied, a same-size source file edited within
             # the same second would otherwise run from stale .pyc files.
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
@@ -136,6 +145,19 @@ def _run_once(root: Path, target: Path, timeout_s: int) -> tuple[RunOutcome, str
         partial = exc.stdout or ""
         if isinstance(partial, bytes):
             partial = partial.decode(errors="replace")
-        return RunOutcome.TIMEOUT, partial + f"\n[timed out after {timeout_s}s]"
+        if name:
+            partial += _remove_container(name)
+        return RunOutcome.TIMEOUT, partial + f"\n[timed out after {host_timeout}s]"
     output = done.stdout + done.stderr
+    if name and done.returncode in TIMEOUT_EXIT_CODES:
+        return RunOutcome.TIMEOUT, output + f"\n[timed out after {timeout_s}s in the sandbox]"
     return classify_run(done.returncode, output), output
+
+
+def _remove_container(name: str) -> str:
+    """Force-remove a container left running after a host-side timeout; report the outcome."""
+    done = subprocess.run(
+        ["docker", "rm", "-f", name], check=False, capture_output=True, text=True, timeout=60
+    )
+    status = "removed" if done.returncode == 0 else f"could not remove: {done.stderr.strip()}"
+    return f"\n[container {name} {status}]"

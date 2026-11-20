@@ -1,5 +1,7 @@
 """Runtime settings, read from environment variables (or a local .env file)."""
 
+from typing import Literal
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,6 +28,16 @@ class Settings(BaseSettings):
     workspace_root: str = "workspace"
     # Hard cap on the retriever's tool calls per run (it over-searched when only instructed).
     retriever_max_tool_calls: int = 8
+    # Where reproduction tests run. "docker": a container with no network, a non-root user,
+    # read-only mounts and resource limits (see tools/isolation.py). "local": this machine.
+    sandbox: Literal["local", "docker"] = "local"
+    sandbox_image: str = "mirror.gcr.io/library/debian:bookworm-slim"
+    sandbox_memory: str = "1g"
+    sandbox_cpus: str = "1"
+    sandbox_pids: int = 256
+    # uv's standalone Python builds live here; checkouts for the docker sandbox are built on
+    # them so the container needs nothing installed (UV_PYTHON_INSTALL_DIR).
+    python_install_dir: str = "/opt/uv-python"
     # A reproduction must fail on every one of these runs to count (flakiness guard).
     repro_runs: int = 3
     test_timeout_s: int = 120
