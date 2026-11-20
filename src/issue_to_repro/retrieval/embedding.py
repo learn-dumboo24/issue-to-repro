@@ -3,8 +3,10 @@
 import hashlib
 import math
 import sqlite3
+import time
 from array import array
-from collections.abc import Sequence
+from collections import deque
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -25,10 +27,46 @@ def normalize(vector: Sequence[float]) -> list[float]:
     return [v / norm for v in vector]
 
 
+class RateLimiter:
+    """Keeps at most `per_minute` units (embedded texts) in any 60-second window.
+
+    The Gemini free tier counts every text in a batch as one request (100/minute for
+    gemini-embedding-2), so pacing on our side beats relying on 429 retries.
+    """
+
+    WINDOW_S = 60.0
+
+    def __init__(
+        self,
+        per_minute: int,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        if per_minute < 1:
+            raise ValueError("per_minute must be at least 1")
+        self.per_minute, self._clock, self._sleep = per_minute, clock, sleep
+        self._spent: deque[tuple[float, int]] = deque()
+
+    def acquire(self, units: int) -> None:
+        if units > self.per_minute:
+            raise ValueError(f"cannot take {units} units at once; the limit is {self.per_minute}")
+        while True:
+            now = self._clock()
+            while self._spent and self._spent[0][0] <= now - self.WINDOW_S:
+                self._spent.popleft()
+            used = sum(n for _, n in self._spent)
+            if used + units <= self.per_minute:
+                self._spent.append((now, units))
+                return
+            self._sleep(self._spent[0][0] + self.WINDOW_S - now)
+
+
 class GeminiEmbedder:
     """Gemini embeddings (`gemini-embedding-2` by default), batched, unit-normalised."""
 
-    def __init__(self, model: str, dims: int, retry_attempts: int = 6) -> None:
+    def __init__(
+        self, model: str, dims: int, requests_per_minute: int = 90, retry_attempts: int = 6
+    ) -> None:
         from google import genai
         from google.genai import types
 
@@ -41,12 +79,15 @@ class GeminiEmbedder:
             http_status_codes=[429, 500, 503, 504],
         )
         self._client = genai.Client(http_options=types.HttpOptions(retry_options=retry))
+        self._limiter = RateLimiter(requests_per_minute)
+        self._batch = min(BATCH_SIZE, requests_per_minute)
 
     def embed(self, texts: Sequence[str], task: Task) -> list[list[float]]:  # pragma: no cover
         vectors: list[list[float]] = []
         config = self._types.EmbedContentConfig(task_type=task, output_dimensionality=self._dims)
-        for start in range(0, len(texts), BATCH_SIZE):
-            batch = list(texts[start : start + BATCH_SIZE])
+        for start in range(0, len(texts), self._batch):
+            batch = list(texts[start : start + self._batch])
+            self._limiter.acquire(len(batch))
             # One Content per text: gemini-embedding-2 merges a plain list[str] into a single
             # embedding, while separate Content items get one embedding each (on all models).
             contents = [self._types.Content(parts=[self._types.Part(text=t)]) for t in batch]

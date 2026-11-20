@@ -143,7 +143,11 @@ def _retrieval_benchmark(
 
     settings = get_settings()
     embedder = CachedEmbedder(
-        GeminiEmbedder(settings.embedding_model, settings.embedding_dims),
+        GeminiEmbedder(
+            settings.embedding_model,
+            settings.embedding_dims,
+            requests_per_minute=settings.embedding_requests_per_minute,
+        ),
         settings.embedding_cache_dir,
     )
     out_path = Path(out)

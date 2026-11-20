@@ -117,7 +117,7 @@ def test_cli_retrieval_benchmark(monkeypatch, history, tmp_path, capsys):
     cases, _ = build_dataset("o/r", repo, since="2020-01-01", fetch=lambda r, n: issue)
     dataset = tmp_path / "d.jsonl"
     write_jsonl(cases, dataset)
-    monkeypatch.setattr(embedding, "GeminiEmbedder", lambda model, dims: WordEmbedder())
+    monkeypatch.setattr(embedding, "GeminiEmbedder", lambda *a, **k: WordEmbedder())
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path / "ws"))
     monkeypatch.setenv("EMBEDDING_CACHE_DIR", str(tmp_path / "cache"))
     out, report = tmp_path / "rows.jsonl", tmp_path / "r.md"

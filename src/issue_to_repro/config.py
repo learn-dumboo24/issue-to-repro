@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-2"
     embedding_dims: int = 768
     embedding_cache_dir: str = "workspace/_embeddings"
+    # Texts embedded per minute; the free tier allows 100 for gemini-embedding-2.
+    embedding_requests_per_minute: int = 90
 
     # Hard per-case limits for backtests (Google Cloud billing has no automatic spending cap).
     backtest_max_llm_calls: int = 40

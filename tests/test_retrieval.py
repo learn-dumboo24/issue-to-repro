@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import pytest
 
 from issue_to_repro.retrieval.chunking import WINDOW_LINES, chunk_checkout, chunk_source
-from issue_to_repro.retrieval.embedding import CachedEmbedder, Task, normalize
+from issue_to_repro.retrieval.embedding import CachedEmbedder, RateLimiter, Task, normalize
 from issue_to_repro.retrieval.index import CodeIndex
 
 SOURCE = '''"""Module docstring."""
@@ -125,3 +125,36 @@ def test_index_edge_cases(tmp_path):
     assert CodeIndex.build(tmp_path, WordEmbedder()).search("anything") == []
     with pytest.raises(ValueError):
         CodeIndex([], [[1.0]], WordEmbedder())
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.slept: list[float] = []
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def test_rate_limiter_paces_to_the_per_minute_budget():
+    clock = FakeClock()
+    limiter = RateLimiter(100, clock=clock, sleep=clock.sleep)
+    limiter.acquire(60)
+    clock.now = 10.0
+    limiter.acquire(40)  # exactly at the budget: no wait
+    assert clock.slept == []
+    limiter.acquire(30)  # must wait until the first 60 units leave the window at t=60
+    assert clock.slept == [50.0] and clock.now == 60.0
+    limiter.acquire(30)  # 40 (t=10) + 30 (t=60) + 30 = 100: fits
+    assert clock.slept == [50.0]
+
+
+def test_rate_limiter_rejects_impossible_requests():
+    with pytest.raises(ValueError):
+        RateLimiter(0)
+    with pytest.raises(ValueError, match="limit is 10"):
+        RateLimiter(10).acquire(11)
