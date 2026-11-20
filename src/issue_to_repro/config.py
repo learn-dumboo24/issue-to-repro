@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     github_webhook_secret: SecretStr | None = None
     # A maintainer adds this label to approve posting the stored reproduction as a comment.
     approve_label: str = "issue-to-repro:approved"
+    # GitHub App credentials for `serve` (the private key is the app's PEM, kept out of git).
+    github_app_id: str | None = None
+    github_app_private_key: SecretStr | None = None
+    # Where the service keeps drafts.
+    service_data_dir: str = "workspace/service"
 
     # Optional; raises GitHub's API rate limit. Public issues work without it.
     github_token: SecretStr | None = None

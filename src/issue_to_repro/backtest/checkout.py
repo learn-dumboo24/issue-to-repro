@@ -2,6 +2,8 @@
 virtualenv, so the target's tests run against the target's code and dependencies."""
 
 import os
+import re
+import shutil
 import subprocess
 import tomllib
 from collections.abc import Callable
@@ -11,6 +13,7 @@ from ..config import get_settings
 from .dataset import Case
 
 PYTHON_VERSION = "3.12"
+REPO_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 TEST_GROUPS = ("tests", "test", "testing")
 REQUIREMENTS_FILES = ("requirements/tests.txt", "requirements/test.txt", "requirements-test.txt")
@@ -77,6 +80,34 @@ def prepare_checkout(
     if target.exists():
         run([*git, "worktree", "remove", "--force", str(target)])
     run([*git, "worktree", "add", "--detach", "--force", str(target), case.base_commit])
+    install_env(target, python, run)
+    return target
+
+
+def prepare_live_checkout(
+    repo: str,
+    issue_number: int,
+    workspace_root: str | Path,
+    python: str | None = None,
+    run: Runner = run_checked,
+) -> Path:
+    """Shallow-clone `repo`'s default branch for one live issue and install its environment."""
+    if not REPO_NAME.match(repo):
+        raise ValueError(f"not a repository name: {repo!r}")
+    if python is None:
+        docker = get_settings().sandbox == "docker"
+        python = standalone_python() if docker else PYTHON_VERSION
+    target = (Path(workspace_root) / "live" / f"{repo.replace('/', '__')}-{issue_number}").resolve()
+    if target.exists():
+        shutil.rmtree(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    run(["git", "clone", "--quiet", "--depth", "1", f"https://github.com/{repo}.git", str(target)])
+    install_env(target, python, run)
+    return target
+
+
+def install_env(target: Path, python: str, run: Runner = run_checked) -> None:
+    """A .venv in `target` with the project (editable) and its test dependencies."""
     venv_python = target / ".venv" / "bin" / "python"
     run(["uv", "venv", "--quiet", "--python", python, str(target / ".venv")])
     run(
@@ -92,7 +123,6 @@ def prepare_checkout(
             *requirements_for_tests(target),
         ]
     )
-    return target
 
 
 def requirements_for_tests(checkout: str | Path) -> list[str]:

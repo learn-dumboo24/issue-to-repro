@@ -68,6 +68,10 @@ def build_parser() -> argparse.ArgumentParser:
     dash.add_argument("--trace", help="Span file to show the per-agent breakdown for")
     dash.add_argument("--out", required=True, help="Output .html")
 
+    serve = commands.add_parser("serve", help="Run the GitHub webhook service")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8080)
+
     retrieval = commands.add_parser("retrieval", help="Code retrieval")
     retrieval_commands = retrieval.add_subparsers(dest="retrieval_command", required=True)
     bench = retrieval_commands.add_parser(
@@ -91,6 +95,8 @@ def main(argv: list[str] | None = None) -> None:
         _reproduce(match["repo"], int(match["number"]), args.checkout, args.dry_run)
     elif args.command == "dataset":
         _dataset_build(args.repo, args.checkout, args.since, args.out)
+    elif args.command == "serve":
+        _serve(args.host, args.port)
     elif args.command == "dashboard":
         _dashboard(args.run, args.retrieval, args.trace, args.out)
     elif args.command == "trace":
@@ -166,6 +172,36 @@ def _backtest_report(results: str, title: str, out: str | None) -> None:
         print(f"wrote {out}")
     else:
         print(markdown, end="")
+
+
+def _serve(host: str, port: int) -> None:
+    import uvicorn
+
+    from .backtest.checkout import prepare_live_checkout
+    from .backtest.runner import run_prompt_adk
+    from .config import get_settings
+    from .service.app import create_app
+    from .service.drafts import FileDraftStore
+    from .service.github_app import GitHubApp
+    from .service.worker import Deps, WorkerQueue, handle
+    from .tools.github import fetch_issue
+
+    s = get_settings()
+    if not s.github_app_id or s.github_app_private_key is None:
+        raise SystemExit("serve needs GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY")
+    deps = Deps(
+        store=FileDraftStore(f"{s.service_data_dir}/drafts"),
+        github=GitHubApp(s.github_app_id, s.github_app_private_key.get_secret_value()),
+        fetch=fetch_issue,
+        prepare=lambda repo, n: prepare_live_checkout(repo, n, s.workspace_root),
+        run=run_prompt_adk,
+        settings=s,
+    )
+    worker = WorkerQueue(lambda action: handle(action, deps))
+    try:
+        uvicorn.run(create_app(worker.put, s), host=host, port=port)
+    finally:
+        worker.stop()
 
 
 def _dashboard(runs: list[str], retrieval: str | None, trace_path: str | None, out: str) -> None:
