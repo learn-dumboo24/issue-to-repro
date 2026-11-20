@@ -1,6 +1,7 @@
 """Summarise backtest results (JSONL from runner.run_backtest) into metrics and Markdown."""
 
 import json
+import math
 import statistics
 from collections import Counter
 from dataclasses import dataclass
@@ -28,6 +29,29 @@ class Summary:
     def precision(self) -> float:
         """Of the reproductions claimed by the sandbox, the share the real fix confirms."""
         return self.verified / self.reproduced if self.reproduced else 0.0
+
+    @property
+    def precision_interval(self) -> tuple[float, float]:
+        """95% Wilson interval for precision: with few claims, 100% can mean much less."""
+        return wilson_interval(self.verified, self.reproduced)
+
+
+def wilson_interval(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for a proportion; (0, 1) when there are no trials."""
+    if not 0 <= successes <= trials:
+        raise ValueError(f"need 0 <= successes <= trials, got {successes}/{trials}")
+    if trials == 0:
+        return 0.0, 1.0
+    p = successes / trials
+    denominator = 1 + z * z / trials
+    centre = (p + z * z / (2 * trials)) / denominator
+    margin = z * math.sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials)) / denominator
+    return max(0.0, centre - margin), min(1.0, centre + margin)
+
+
+def interval_text(interval: tuple[float, float]) -> str:
+    low, high = interval
+    return f"95% CI {low:.0%}–{high:.0%}"
 
 
 def load_results(path: str | Path) -> list[dict[str, Any]]:
@@ -68,7 +92,10 @@ def render_markdown(results: list[dict[str, Any]], title: str) -> str:
         f"| Models (coordinator/worker) | {', '.join(sorted(s.models)) or 'n/a'} |",
         f"| Cases | {s.cases} |",
         f'| Sandbox said "reproduced" | {s.reproduced} |',
-        f"| ...confirmed by the real fix (precision) | {s.verified} ({s.precision:.0%}) |",
+        (
+            f"| ...confirmed by the real fix (precision) | {s.verified} ({s.precision:.0%}, "
+            f"{interval_text(s.precision_interval)}) |"
+        ),
         f"| Outcomes | {', '.join(f'{k}: {v}' for k, v in s.verdicts.items())} |",
         f"| Tokens, total / per case | {s.total_tokens:,} / {s.tokens_per_case:,.0f} |",
         f"| Latency per case, p50 / p95 | {s.latency_p50_s:.0f}s / {s.latency_p95_s:.0f}s |",

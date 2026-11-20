@@ -7,7 +7,7 @@
 | Models (coordinator/worker) | gemini-3.1-flash-lite/gemini-3.1-flash-lite |
 | Cases | 3 |
 | Sandbox said "reproduced" | 3 |
-| ...confirmed by the real fix (precision) | 2 (67%) |
+| ...confirmed by the real fix (precision) | 2 (67%, 95% CI 21%–94%) |
 | Outcomes | reproduced: 3 |
 | Tokens, total / per case | 311,490 / 103,830 |
 | Latency per case, p50 / p95 | 52s / 58s |

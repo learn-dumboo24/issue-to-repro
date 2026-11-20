@@ -23,10 +23,23 @@ All notable changes are listed here. The format follows
   report contains code; runs refuse to start outside the Docker sandbox. A manually started
   workflow runs it on GitHub Actions, with the model key and the write token in separate jobs.
 - `list_open_issues`: the newest open issues of a repository, pull requests left out.
+- The first shadow run and its review (`results/shadow/`): 5 claimed reproductions on Click,
+  Jinja and attrs; 1 correct as written, 2 half right, 1 invalid, 1 premature; none shared.
+- Backtest report and dashboard: a 95% Wilson interval for precision, since a few claims cannot
+  show 100%.
+- README: scope and limitations, and how the project compares with related work.
 
 ### Changed
 - `prepare_worktree`: the worktree-and-venv step of `prepare_checkout`, now shared with
   `bench verify`.
+- Sandbox: a test file in which some tests fail and others pass is now `invalid`, with a note
+  for the agents; every test must fail because of the bug. The 10 benchmark tasks still pass.
+- Agent instructions, from the shadow review: keep the reporter's module-level code at module
+  level, assert only behaviour the issue states as expected, and label "is this intended?"
+  reports as `question`.
+- README: the precision claim now gives the interval and the runs with false claims that the fix
+  check rejected.
+- Ruff no longer formats `results/`: code blocks in run outputs must stay as produced.
 
 ## [0.5.0] - Phase 5: Observability
 
