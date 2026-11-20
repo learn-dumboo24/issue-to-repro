@@ -11,6 +11,9 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - Backtest (calls Gemini): `uv run issue-to-repro backtest run --dataset datasets/click.jsonl
   --source workspace/_sources/click --out results/<name>.jsonl --issues 3362`, then
   `uv run issue-to-repro backtest report --results results/<name>.jsonl`
+- Trace a run: add `--trace results/traces/<name>.jsonl` to `backtest run`; analyse with
+  `uv run issue-to-repro trace report --trace ...`. Regenerate `docs/index.html` with the
+  `dashboard` command in README whenever results change.
 - Model / retrieval switches: `MODEL_PROVIDER=gemini|anthropic`, `COORDINATOR_MODEL`,
   `WORKER_MODEL`, `RETRIEVAL=keyword|semantic`. Always set `BACKTEST_MAX_USD` for paid models.
 

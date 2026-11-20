@@ -43,10 +43,30 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--out", required=True, help="Results .jsonl (appended; reruns resume)")
     run.add_argument("--issues", help="Comma-separated issue numbers to run (default: all)")
     run.add_argument("--limit", type=int, help="Run at most this many cases")
+    run.add_argument("--trace", help="Write OpenTelemetry spans here (JSON lines)")
     report = backtest_commands.add_parser("report", help="Summarise a results file as Markdown")
     report.add_argument("--results", required=True, help="Results .jsonl")
     report.add_argument("--title", default="Backtest results")
     report.add_argument("--out", help="Write Markdown here instead of printing it")
+
+    trace_cmd = commands.add_parser("trace", help="Analyse OpenTelemetry span files")
+    trace_commands = trace_cmd.add_subparsers(dest="trace_command", required=True)
+    trace_report = trace_commands.add_parser("report", help="Per-agent / per-case breakdown")
+    trace_report.add_argument("--trace", required=True, help="Span file from backtest run --trace")
+    trace_report.add_argument("--title", default="Trace report")
+    trace_report.add_argument("--out", help="Write Markdown here instead of printing it")
+
+    dash = commands.add_parser("dashboard", help="Render an HTML dashboard from results")
+    dash.add_argument(
+        "--run",
+        action="append",
+        required=True,
+        metavar="LABEL=RESULTS.jsonl",
+        help="A backtest results file and its label; repeat for each run",
+    )
+    dash.add_argument("--retrieval", help="Rows from retrieval benchmark (.jsonl)")
+    dash.add_argument("--trace", help="Span file to show the per-agent breakdown for")
+    dash.add_argument("--out", required=True, help="Output .html")
 
     retrieval = commands.add_parser("retrieval", help="Code retrieval")
     retrieval_commands = retrieval.add_subparsers(dest="retrieval_command", required=True)
@@ -71,10 +91,14 @@ def main(argv: list[str] | None = None) -> None:
         _reproduce(match["repo"], int(match["number"]), args.checkout, args.dry_run)
     elif args.command == "dataset":
         _dataset_build(args.repo, args.checkout, args.since, args.out)
+    elif args.command == "dashboard":
+        _dashboard(args.run, args.retrieval, args.trace, args.out)
+    elif args.command == "trace":
+        _trace_report(args.trace, args.title, args.out)
     elif args.command == "retrieval":
         _retrieval_benchmark(args.dataset, args.source, args.out, args.report, args.since)
     elif args.backtest_command == "run":
-        _backtest_run(args.dataset, args.source, args.out, args.issues, args.limit)
+        _backtest_run(args.dataset, args.source, args.out, args.issues, args.limit, args.trace)
     else:
         _backtest_report(args.results, args.title, args.out)
 
@@ -102,7 +126,12 @@ def _dataset_build(repo: str, checkout: str, since: str, out: str) -> None:
 
 
 def _backtest_run(
-    dataset: str, source: str, out: str, issues: str | None, limit: int | None
+    dataset: str,
+    source: str,
+    out: str,
+    issues: str | None,
+    limit: int | None,
+    trace_path: str | None = None,
 ) -> None:
     from .backtest.dataset import read_jsonl
     from .backtest.runner import default_prepare, run_backtest
@@ -114,7 +143,16 @@ def _backtest_run(
         cases = [c for c in cases if c.issue_number in wanted]
     cases = cases[:limit] if limit else cases
     workspace = get_settings().workspace_root
-    run_backtest(cases, out, default_prepare(source, workspace))
+    provider = None
+    if trace_path:
+        from .observability.tracing import configure_tracing
+
+        provider = configure_tracing(trace_path)
+    try:
+        run_backtest(cases, out, default_prepare(source, workspace))
+    finally:
+        if provider is not None:
+            provider.shutdown()
 
 
 def _backtest_report(results: str, title: str, out: str | None) -> None:
@@ -123,6 +161,45 @@ def _backtest_report(results: str, title: str, out: str | None) -> None:
     from .backtest.report import load_results, render_markdown
 
     markdown = render_markdown(load_results(results), title)
+    if out:
+        Path(out).write_text(markdown, encoding="utf-8")
+        print(f"wrote {out}")
+    else:
+        print(markdown, end="")
+
+
+def _dashboard(runs: list[str], retrieval: str | None, trace_path: str | None, out: str) -> None:
+    import json
+    from pathlib import Path
+
+    from .backtest.report import load_results
+    from .observability.dashboard import Run, render
+    from .observability.tracing import load_spans
+
+    parsed = []
+    for item in runs:
+        label, sep, path = item.partition("=")
+        if not sep or not label or not path:
+            raise SystemExit(f"--run must look like LABEL=results.jsonl, got {item!r}")
+        parsed.append(Run(label, load_results(path)))
+    retrieval_rows = (
+        [json.loads(line) for line in Path(retrieval).read_text().splitlines() if line.strip()]
+        if retrieval
+        else None
+    )
+    spans = load_spans(trace_path) if trace_path else None
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    Path(out).write_text(render(parsed, retrieval_rows, spans), encoding="utf-8")
+    print(f"wrote {out}")
+
+
+def _trace_report(trace_path: str, title: str, out: str | None) -> None:
+    from pathlib import Path
+
+    from .observability.analyze import render_markdown
+    from .observability.tracing import load_spans
+
+    markdown = render_markdown(load_spans(trace_path), title)
     if out:
         Path(out).write_text(markdown, encoding="utf-8")
         print(f"wrote {out}")

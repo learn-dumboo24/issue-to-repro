@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Settings, get_settings
+from ..observability.tracing import TRACER
 from ..tools.sandbox import rerun_test
 from .checkout import prepare_checkout
 from .dataset import Case
@@ -76,14 +77,34 @@ def build_prompt(case: Case, checkout: Path) -> str:
 
 
 def run_case(case: Case, prepare: Prepare, run_agents: RunAgents, settings: Settings) -> CaseResult:
+    """One case, traced as `backtest.case` with child spans for each stage."""
+    models = f"{settings.coordinator_model}/{settings.worker_model}"
+    with TRACER.start_as_current_span(
+        "backtest.case", attributes={"case.id": case.case_id, "case.models": models}
+    ) as span:
+        result = _run_case(case, prepare, run_agents, settings)
+        span.set_attribute("case.verdict", result.verdict)
+        span.set_attribute("case.fail_to_pass", str(result.fail_to_pass))
+        span.set_attribute("case.llm_calls", result.llm_calls)
+        span.set_attribute("case.tokens", result.prompt_tokens + result.output_tokens)
+        if result.cost_usd is not None:
+            span.set_attribute("case.cost_usd", result.cost_usd)
+        return result
+
+
+def _run_case(
+    case: Case, prepare: Prepare, run_agents: RunAgents, settings: Settings
+) -> CaseResult:
     started = time.monotonic()
     try:
-        checkout = prepare(case)
+        with TRACER.start_as_current_span("backtest.prepare"):
+            checkout = prepare(case)
     except (subprocess.CalledProcessError, OSError) as exc:
         detail = getattr(exc, "stderr", "") or str(exc)
         return _failed(case, "setup_error", f"{type(exc).__name__}: {detail}"[:2_000], started)
 
-    run = run_agents(case, checkout, settings)
+    with TRACER.start_as_current_span("backtest.agents"):
+        run = run_agents(case, checkout, settings)
     attempts = [r["result"] for r in run.repro_results if r.get("status") == "ok"]
     last = attempts[-1] if attempts else None
     fail_to_pass = fix_runs = None
@@ -91,7 +112,8 @@ def run_case(case: Case, prepare: Prepare, run_agents: RunAgents, settings: Sett
     if last is not None:
         test_code = (checkout / last["test_path"]).read_text(encoding="utf-8")
         if last["verdict"] == "reproduced":
-            fix_runs = check_against_fix(checkout, case, last["test_path"])
+            with TRACER.start_as_current_span("backtest.fix_check"):
+                fix_runs = check_against_fix(checkout, case, last["test_path"])
             fail_to_pass = all(outcome == "passed" for outcome in fix_runs)
     return CaseResult(
         case_id=case.case_id,

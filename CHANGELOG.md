@@ -4,6 +4,23 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - Phase 5: Observability
+
+### Added
+- `backtest run --trace FILE`: OpenTelemetry spans as JSON lines, covering ADK's agent, model
+  (with token usage) and tool spans plus each case's prepare / agents / fix-check stages.
+  Credential-like attributes are dropped and long values truncated.
+- `trace report`: per-agent model calls, tokens, model and tool time; per-case stage times; the
+  slowest model calls. On a free-tier run it showed one model call taking 111s for 1,149 input
+  tokens (overload retries), which the results alone could not reveal.
+- `dashboard`: a self-contained HTML page (`docs/index.html`) comparing runs (verified, precision,
+  tokens, p50/p95, cost per verified fix), a per-case grid, the retrieval benchmark and a traced
+  run's per-agent breakdown. Light and dark themes; works on phones.
+
+### Changed
+- Exporting traces to Google Cloud Trace moves to Phase 6, where Cloud Run's service account
+  authenticates without a key file.
+
 ## [0.4.0] - Phase 4: Retrieval, model providers and cost control
 
 ### Added
