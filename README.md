@@ -139,6 +139,25 @@ Haiku verified 9 and Flash-Lite 8.
 Click ([`results/click-haiku-semantic.md`](results/click-haiku-semantic.md)). Details in
 [`results/`](results/).
 
+### End-to-end demo
+
+[learn-dumboo24/issue-to-repro-demo](https://github.com/learn-dumboo24/issue-to-repro-demo) is a
+small expense-splitting package with four planted bugs and one feature request, each filed as a
+GitHub issue. `demo run` gives the agents each issue's frozen text (`demo/issues.md`) and checks
+every reproduction against reference fixes (`demo/fix/`): a test counts only if it fails on the
+shipped code and passes once the fix is copied in.
+
+```bash
+uv run issue-to-repro demo run --repo learn-dumboo24/issue-to-repro-demo \
+  --issues demo/issues.md --fix demo/fix --out results/demo-flash-lite.jsonl
+uv run issue-to-repro demo report --repo learn-dumboo24/issue-to-repro-demo \
+  --results results/demo-flash-lite.jsonl
+```
+
+On Gemini 3.1 Flash-Lite (free tier) all four bugs were verified and the feature request was
+classified as such, with no test written: 6–9 model calls and 11k–25k tokens per issue
+([`results/demo-flash-lite.md`](results/demo-flash-lite.md)).
+
 ## Roadmap
 
 Built in phases; each phase lands as one pull request and a tagged release
