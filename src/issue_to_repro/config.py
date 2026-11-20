@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Reproducer <-> verifier rounds before giving up on an issue.
     max_repro_attempts: int = 4
 
+    # Semantic code search (retrieval/): Gemini embeddings, cached on disk by content hash.
+    embedding_model: str = "gemini-embedding-2"
+    embedding_dims: int = 768
+    embedding_cache_dir: str = "workspace/_embeddings"
+
     # Hard per-case limits for backtests (Google Cloud billing has no automatic spending cap).
     backtest_max_llm_calls: int = 40
     backtest_max_tokens: int = 400_000
