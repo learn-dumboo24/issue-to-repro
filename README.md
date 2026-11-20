@@ -31,7 +31,7 @@ coordinator (ADK SequentialAgent: fixed order)
 |---|---|
 | Multi-agent pipeline with hierarchical delegation and a self-reflection loop | Agent Development Kit (ADK) + Gemini |
 | Retrieval over code, docs, closed issues, commits | keyword baseline now → Vertex AI embeddings + vector search |
-| Sandboxed test runs | local runner now → Cloud Run jobs |
+| Sandboxed test runs | Docker: no network, non-root, read-only (`SANDBOX=docker`) → Cloud Run jobs |
 | GitHub webhook service | Cloud Run |
 | Tracing and LLM metrics (cost per issue, latency, tokens/sec) | ADK OpenTelemetry → Cloud Trace, BigQuery |
 
@@ -52,8 +52,26 @@ uv run issue-to-repro reproduce owner/name#123 --checkout workspace/name --dry-r
 To run the agents for real, set Gemini credentials (see `.env.example`), clone the target repo
 under `workspace/`, and drop `--dry-run`. `uv run adk web src` opens the ADK dev UI.
 
-> **Security:** until the Cloud Run sandbox lands, reproductions execute the target repo's code
-> on your machine. Only use trusted repositories.
+## Sandbox
+
+Reproductions run the target repository's own code, so they run in a container
+(`SANDBOX=docker`; `local` is the default for development on trusted repos):
+
+| Control | Setting |
+|---|---|
+| Network | none (`--network none`) |
+| User | `nobody`, all capabilities dropped, `no-new-privileges` |
+| Filesystem | read-only root, read-only mounts of the checkout and interpreter, 64 MB `/tmp` |
+| Resources | 1 GB memory, 1 CPU, 256 processes (configurable) |
+| Time | in-container `timeout`; a container left behind is force-removed |
+
+Nothing is installed inside the container. The checkout's virtualenv is built beforehand (with
+network access, by trusted code) on uv's standalone Python, and both are mounted read-only at the
+same paths. CI checks the isolation with real containers (`uv run pytest -m docker`).
+
+```bash
+SANDBOX=docker uv run issue-to-repro backtest run ...   # needs Docker
+```
 
 ## Backtesting
 
@@ -88,8 +106,8 @@ Built in phases; each phase lands as one pull request and a tagged release
 |---|---|---|
 | 1. Foundation | Agents, verified reproduction runner, CI, typing, coverage gate | ✅ v0.1.0 |
 | 2. Backtest harness | Replay fixed bugs; score against the real fix. **8/10 Click bugs verified** | ✅ v0.2.0 |
-| 3. Sandbox | Run reproductions in Docker, then Cloud Run jobs | Next |
-| 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Planned |
+| 3. Sandbox | Reproductions in a locked-down container; isolation tested in CI | ✅ v0.3.0 |
+| 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Next |
 | 5. Observability | ADK OpenTelemetry → Cloud Trace; cost and latency per issue | Planned |
 | 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval | Planned |
 | 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |

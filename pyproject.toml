@@ -1,6 +1,6 @@
 [project]
 name = "issue-to-repro"
-version = "0.2.0"
+version = "0.3.0"
 description = "Turns GitHub bug reports into verified failing tests for maintainers. ADK + Gemini + Cloud Run."
 readme = "README.md"
 license = "Apache-2.0"
@@ -30,7 +30,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov --cov-report=term"
+addopts = "--cov --cov-report=term -m 'not docker'"
+markers = ["docker: integration tests that start real containers (run with -m docker)"]
 
 [tool.ruff]
 line-length = 100

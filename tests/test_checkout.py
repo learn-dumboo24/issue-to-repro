@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
 from conftest import git
 
 from issue_to_repro.backtest.checkout import (
@@ -93,3 +94,49 @@ def test_sandbox_uses_the_checkouts_own_python(workspace):
         run_reproduction(str(workspace), "test_issue_repro_9.py", code)["verdict"] == "reproduced"
     )
     assert Path(marker).read_text().strip() == "venv"
+
+
+def test_docker_sandbox_builds_venvs_on_the_standalone_python(history, tmp_path, monkeypatch):
+    from issue_to_repro.backtest import checkout as checkout_module
+
+    repo, base, fix = history
+    monkeypatch.setenv("SANDBOX", "docker")
+    monkeypatch.setattr(checkout_module, "standalone_python", lambda: "/opt/uv-python/py3.12")
+    commands: list[list[str]] = []
+
+    def record(command: list[str]) -> None:
+        commands.append(command)
+        if command[0] == "git":
+            run_checked(command)
+
+    prepare_checkout(repo, make_case(base, fix), tmp_path / "ws", run=record)
+    uv_venv = next(c for c in commands if c[:2] == ["uv", "venv"])
+    assert uv_venv[uv_venv.index("--python") + 1] == "/opt/uv-python/py3.12"
+
+
+def test_standalone_python_installs_into_the_configured_dir(monkeypatch):
+    from issue_to_repro.backtest import checkout as checkout_module
+
+    seen = []
+    found = {"path": "/opt/x/cpython-3.12/bin/python3.12"}
+
+    class Done:
+        @property
+        def stdout(self):
+            return found["path"] + "\n"
+
+    def fake_run(cmd, **kwargs):
+        env = kwargs["env"]
+        seen.append((cmd, env["UV_PYTHON_INSTALL_DIR"], "VIRTUAL_ENV" in env))
+        return Done()
+
+    monkeypatch.setenv("VIRTUAL_ENV", "/some/project/.venv")
+    monkeypatch.setattr(checkout_module.subprocess, "run", fake_run)
+    assert checkout_module.standalone_python("3.12", "/opt/x") == found["path"]
+    assert seen[0] == (["uv", "python", "install", "--no-bin", "3.12"], "/opt/x", False)
+    assert seen[1][0] == ["uv", "python", "find", "--no-project", "--managed-python", "3.12"]
+
+    # An interpreter outside the install dir (e.g. an active project venv) is an error.
+    found["path"] = "/some/project/.venv/bin/python3"
+    with pytest.raises(RuntimeError, match="not a standalone Python"):
+        checkout_module.standalone_python("3.12", "/opt/x")

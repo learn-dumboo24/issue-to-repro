@@ -1,12 +1,16 @@
 """Prepare a checkout of one backtest case: a git worktree at the buggy commit with its own
 virtualenv, so the target's tests run against the target's code and dependencies."""
 
+import os
 import subprocess
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
+from ..config import get_settings
 from .dataset import Case
+
+PYTHON_VERSION = "3.12"
 
 TEST_GROUPS = ("tests", "test", "testing")
 REQUIREMENTS_FILES = ("requirements/tests.txt", "requirements/test.txt", "requirements-test.txt")
@@ -21,14 +25,53 @@ def checkout_dir(case: Case, workspace_root: str | Path) -> Path:
     return Path(workspace_root) / f"{case.repo.split('/')[1]}-{case.issue_number}"
 
 
+def standalone_python(version: str = PYTHON_VERSION, install_dir: str | None = None) -> str:
+    """Install (if needed) and return uv's standalone CPython in `install_dir`.
+
+    The docker sandbox mounts this directory into the container, so checkouts built on it need
+    nothing installed inside the container.
+    """
+    install_dir = install_dir or get_settings().python_install_dir
+    # Without VIRTUAL_ENV and with --no-project: inside `uv run`, uv would otherwise return the
+    # active project venv's interpreter instead of the standalone one.
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    env["UV_PYTHON_INSTALL_DIR"] = install_dir
+    subprocess.run(
+        ["uv", "python", "install", "--no-bin", version],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    found = subprocess.run(
+        ["uv", "python", "find", "--no-project", "--managed-python", version],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    python = found.stdout.strip()
+    root = Path(install_dir).resolve()
+    if root not in Path(python).resolve().parents:
+        raise RuntimeError(f"uv returned {python!r}, which is not a standalone Python in {root}")
+    return python
+
+
 def prepare_checkout(
     source: str | Path,
     case: Case,
     workspace_root: str | Path,
-    python: str = "3.12",
+    python: str | None = None,
     run: Runner = run_checked,
 ) -> Path:
-    """Create (or recreate) the case's worktree at `base_commit` and install its environment."""
+    """Create (or recreate) the case's worktree at `base_commit` and install its environment.
+
+    With SANDBOX=docker the virtualenv is built on uv's standalone Python; otherwise on any
+    Python `PYTHON_VERSION` uv can find.
+    """
+    if python is None:
+        docker = get_settings().sandbox == "docker"
+        python = standalone_python() if docker else PYTHON_VERSION
     target = checkout_dir(case, workspace_root).resolve()
     git = ["git", "-C", str(source)]
     if target.exists():
