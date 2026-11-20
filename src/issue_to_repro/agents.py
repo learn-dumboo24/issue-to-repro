@@ -60,6 +60,12 @@ Rules for the test:
   correct.
 - Every test in the file must fail on the current code; the tool rejects a file where any test
   passes. One test per expected behaviour, no debug prints, no commentary about earlier attempts.
+- Test the reported behaviour through the public API. Never test how the code is written (mocking
+  internals to check call arguments or names) just to get a failure.
+If the bug needs something the sandbox cannot provide (another operating system such as Windows
+or macOS, particular hardware, a network or a service), or the reporter says it happens only some
+of the time, do not write a test: call exit_loop and say why in one sentence. Code that only
+handles another platform's data (Windows paths, PowerShell scripts) can still be tested here.
 If the verifier gave feedback in an earlier round, address it first. Report the test code and the
 tool's verdict."""
 
@@ -67,8 +73,9 @@ VERIFIER_INSTRUCTION = """Check the reproducer's latest attempt.
 Accept it only if ALL hold: the tool verdict is "reproduced"; the failure output shows the
 behaviour described in the issue (not an unrelated error); every assertion checks behaviour the
 issue states as expected, not the current buggy behaviour and not something the reporter said is
-correct; the reporter's module-level code was not moved into a function; it does not depend on
-network, time or randomness. If all hold, call exit_loop. Otherwise give the reproducer one
+correct; the reporter's module-level code was not moved into a function; it exercises the
+reported behaviour rather than implementation details such as mocked internal calls; it does not
+depend on network, time or randomness. If all hold, call exit_loop. Otherwise give the reproducer one
 concrete fix."""
 
 REPORTER_INSTRUCTION = """Write a short report for the project's maintainer: the classification,
