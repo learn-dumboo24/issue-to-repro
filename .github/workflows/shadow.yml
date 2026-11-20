@@ -70,7 +70,9 @@ jobs:
           REPOS: ${{ inputs.repos }}
         run: |
           mkdir -p results/shadow
-          args=(--config shadow/config.json --out "results/shadow/$RUN_NAME.jsonl" --per-repo "$PER_REPO")
+          # Skip issues from earlier, reviewed runs (kept in results/shadow on main).
+          args=(--config shadow/config.json --out "results/shadow/$RUN_NAME.jsonl" --per-repo "$PER_REPO"
+                --skip-tried results/shadow)
           if [ -n "$REPOS" ]; then args+=(--repos "$REPOS"); fi
           uv run issue-to-repro shadow run "${args[@]}"
       - name: Report

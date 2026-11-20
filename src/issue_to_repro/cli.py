@@ -94,6 +94,9 @@ def build_parser() -> argparse.ArgumentParser:
     shadow_run.add_argument("--out", required=True, help="Results .jsonl (appended; reruns resume)")
     shadow_run.add_argument("--repos", help="Comma-separated subset of the config's repos")
     shadow_run.add_argument("--per-repo", type=int, help="Override the config's per_repo")
+    shadow_run.add_argument(
+        "--skip-tried", help="Folder of earlier results (.jsonl); issues found there are skipped"
+    )
     shadow_report = shadow_commands.add_parser("report", help="Summarise shadow results")
     shadow_report.add_argument("--results", required=True, help="Results .jsonl from shadow run")
     shadow_report.add_argument("--title", default="Shadow run")
@@ -163,7 +166,7 @@ def main(argv: list[str] | None = None) -> None:
             _bench_verify(args.tasks, args.source, args.only, args.out)
     elif args.command == "shadow":
         if args.shadow_command == "run":
-            _shadow_run(args.config, args.out, args.repos, args.per_repo)
+            _shadow_run(args.config, args.out, args.repos, args.per_repo, args.skip_tried)
         else:
             _shadow_report(args.results, args.title, args.out)
     elif args.command == "trace":
@@ -308,7 +311,13 @@ def _bench_verify(tasks_file: str, source: str, only: str | None, out: str | Non
         raise SystemExit(1)
 
 
-def _shadow_run(config_path: str, out: str, repos: str | None, per_repo: int | None) -> None:
+def _shadow_run(
+    config_path: str,
+    out: str,
+    repos: str | None,
+    per_repo: int | None,
+    skip_tried: str | None = None,
+) -> None:
     from dataclasses import replace
     from pathlib import Path
 
@@ -334,6 +343,13 @@ def _shadow_run(config_path: str, out: str, repos: str | None, per_repo: int | N
         chosen_repos = tuple(r for r in config.repos if r in wanted)
     results_path = Path(out)
     done = done_issues(load_results(results_path))
+    if skip_tried:
+        folder = Path(skip_tried)
+        if not folder.is_dir():
+            raise SystemExit(f"--skip-tried: no such folder {skip_tried}")
+        for earlier in sorted(folder.glob("*.jsonl")):
+            done |= done_issues(load_results(earlier))
+        print(f"skipping {len(done)} issues tried before")
     candidates = []
     for repo in chosen_repos:
         picked = select_issues(repo, list_open_issues(repo), config, done)
