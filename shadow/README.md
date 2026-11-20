@@ -12,7 +12,7 @@ This is the test that backtests can't give: whether the tool helps on issues nob
 [`config.json`](config.json) lists the repositories, how many issues to try per repository
 (`per_repo`) and how old an issue may be (`max_age_days`). Targets are well-known Python projects
 whose test dependencies the installer understands (a `tests`/`test` dependency group or a test
-requirements file): Click, Jinja, attrs and Typer.
+requirements file): Click, Jinja, Flask, attrs, Typer and more-itertools.
 
 ## Which issues are tried
 

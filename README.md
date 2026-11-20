@@ -173,11 +173,12 @@ limitations.
 
 ### Shadow mode
 
-`shadow run` tries the agents on recent open bug reports of real projects (Click, Jinja, attrs,
-Typer) and keeps the results for review; **nothing is posted**. A manually started workflow runs
-it on GitHub Actions in the Docker sandbox and pushes the results to a review branch. A person
-checks each reproduction before offering it to the maintainers. Selection rules, the review
-checklist and the safety design are in [`shadow/README.md`](shadow/README.md).
+`shadow run` tries the agents on recent open bug reports of real projects (Click, Jinja, Flask,
+attrs, Typer, more-itertools) and keeps the results for review; **nothing is posted**. A
+manually started workflow runs it on GitHub Actions in the Docker sandbox and pushes the results
+to a review branch. A person checks each reproduction before offering it to the maintainers.
+Selection rules, the review checklist and the safety design are in
+[`shadow/README.md`](shadow/README.md).
 
 **First run (5 claimed reproductions on Click, Jinja and attrs): 1 correct as written, 2 half
 right, 1 invalid, 1 premature; none shared.** Without a fix to check against, the sandbox accepted
@@ -190,13 +191,18 @@ mistakes the changes targeted were gone, and the two that remained were instruct
 not follow ([review](results/shadow/review-44820404301.md)). One run each on 5 issues, so a
 signal rather than a measurement.
 
+**Third run, 2 new issues: 1 correct, 1 invalid.** The invalid one was a Windows-only, intermittent
+bug: unable to reproduce it, the agents tested an invented detail until something failed. They are
+now told to write nothing for bugs the sandbox cannot reproduce and never to test how the code is
+written ([review](results/shadow/review-44822215060.md)).
+
 ## Scope and limitations
 
 - **Python projects tested with pytest** whose test dependencies the installer understands. Bugs
   that need services, networks, GUIs or a particular operating system are out of reach of the
   sandbox; they end as `setup_error`, `invalid` or `not_reproduced`.
-- **Small evaluation so far:** 12 backtest cases from one repository and two shadow runs of 5
-  claims each. Treat the percentages as indications, with the intervals shown.
+- **Small evaluation so far:** 12 backtest cases from one repository and three shadow runs
+  (12 claimed reproductions). Treat the percentages as indications, with the intervals shown.
 - **Contamination:** Click's fixed issues are public, so models may have seen them. The task is to
   write a failing test, not the fix, which lowers but does not remove the risk. Shadow mode uses
   open issues, which no model can have seen fixed.
@@ -233,7 +239,7 @@ Built in phases; each phase lands as one pull request and a tagged release
 | 4. Retrieval | Gemini-embedding code search; right file first 87% vs 52% for keyword search | ✅ v0.4.0 |
 | 5. Observability | OpenTelemetry spans, per-agent cost/latency breakdown, [dashboard](https://learn-dumboo24.github.io/issue-to-repro/) | ✅ v0.5.0 |
 | 6. Production | Webhook service, comment-only GitHub App with maintainer approval, [end-to-end demo](#end-to-end-demo) (4/4 planted bugs verified); next: Cloud Run, Cloud Trace export | 🚧 Part 1 merged |
-| 7. Real users | [Shadow mode](shadow/README.md) on open issues of Click, Jinja, attrs and Typer; review, then offer tests to maintainers; public write-up | 🚧 In progress |
+| 7. Real users | [Shadow mode](shadow/README.md) on open issues of six Python projects; review, then offer tests to maintainers; public write-up | 🚧 In progress |
 | 8. Benchmarks | Verified fail-to-pass agent tasks from fixed issues: [10 Click tasks](bench/README.md), re-proved in the Docker sandbox in CI | ✅ Merged |
 
 Public repositories only.

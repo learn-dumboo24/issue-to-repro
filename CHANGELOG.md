@@ -27,6 +27,8 @@ All notable changes are listed here. The format follows
   Jinja and attrs; 1 correct as written, 2 half right, 1 invalid, 1 premature; none shared.
 - The second shadow run and its review: on the same 6 issues after the changes below, 3 of 5
   claimed reproductions are correct as written (was 1).
+- The third shadow run and its review: 2 new issues, 1 correct and 1 invalid (a Windows-only,
+  intermittent bug the agents could not reproduce, so they tested an invented detail).
 - `shadow run --skip-tried DIR`: skip issues found in earlier results; the workflow passes
   `results/shadow`, where reviewed runs are kept.
 - Backtest report and dashboard: a 95% Wilson interval for precision, since a few claims cannot
@@ -43,6 +45,10 @@ All notable changes are listed here. The format follows
   reports as `question`.
 - README: the precision claim now gives the interval and the runs with false claims that the fix
   check rejected.
+- Agent instructions, from the third review: write no test for bugs the sandbox cannot reproduce
+  (another operating system, hardware, network, or intermittent) and never test how the code is
+  written; the verifier rejects mocked-internals tests.
+- Shadow targets: Flask and more-itertools added.
 - Ruff no longer formats `results/`: code blocks in run outputs must stay as produced.
 
 ## [0.5.0] - Phase 5: Observability
