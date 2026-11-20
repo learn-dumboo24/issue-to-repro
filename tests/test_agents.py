@@ -1,6 +1,6 @@
 from google.adk.agents import LlmAgent, LoopAgent, SequentialAgent
 
-from issue_to_repro.agents import build_agents
+from issue_to_repro.agents import build_agents, tool_budget
 from issue_to_repro.config import Settings
 
 
@@ -46,3 +46,28 @@ def test_models_retry_on_overload():
     retry = retriever.model.retry_options
     assert retry.attempts == 3
     assert 503 in retry.http_status_codes and 429 in retry.http_status_codes
+
+
+class FakeContext:
+    def __init__(self, agent_name: str):
+        self.agent_name = agent_name
+        self.state: dict = {}
+
+
+def test_tool_budget_refuses_calls_beyond_the_limit():
+    budget = tool_budget(2)
+    retriever = FakeContext("retriever")
+    assert budget(None, {}, retriever) is None
+    assert budget(None, {}, retriever) is None
+    refused = budget(None, {}, retriever)
+    assert refused["status"] == "error" and "budget of 2" in refused["error"]
+    # Counted per agent: another agent in the same run is unaffected.
+    assert budget(None, {}, FakeContext("reproducer")) is None
+
+
+def test_retriever_has_a_tool_budget_and_reproducer_does_not():
+    root = build_agents(Settings(retriever_max_tool_calls=3))
+    retriever = root.sub_agents[0]
+    reproducer = root.sub_agents[2].sub_agents[0]
+    assert retriever.before_tool_callback is not None
+    assert reproducer.before_tool_callback is None  # it must always be able to call exit_loop

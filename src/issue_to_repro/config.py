@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     # Only checkouts under this directory may be searched or have tests run in them.
     workspace_root: str = "workspace"
+    # Hard cap on the retriever's tool calls per run (it over-searched when only instructed).
+    retriever_max_tool_calls: int = 8
     # A reproduction must fail on every one of these runs to count (flakiness guard).
     repro_runs: int = 3
     test_timeout_s: int = 120
