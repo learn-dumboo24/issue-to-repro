@@ -37,6 +37,8 @@ markers = ["docker: integration tests that start real containers (run with -m do
 
 [tool.ruff]
 line-length = 100
+# Frozen issue texts: their code blocks must stay exactly as filed.
+extend-exclude = ["demo/issues.md"]
 
 [tool.mypy]
 python_version = "3.12"

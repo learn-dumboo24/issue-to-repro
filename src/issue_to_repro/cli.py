@@ -1,4 +1,4 @@
-"""Command line: `issue-to-repro reproduce | dataset build | backtest run | backtest report`."""
+"""Command line: `issue-to-repro reproduce | dataset build | backtest run|report | demo run|report | ...`."""
 
 import argparse
 import asyncio
@@ -48,6 +48,20 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--results", required=True, help="Results .jsonl")
     report.add_argument("--title", default="Backtest results")
     report.add_argument("--out", help="Write Markdown here instead of printing it")
+
+    demo = commands.add_parser("demo", help="Run the agents on filed issues with reference fixes")
+    demo_commands = demo.add_subparsers(dest="demo_command", required=True)
+    demo_run = demo_commands.add_parser("run", help="Reproduce each issue, check against the fix")
+    demo_run.add_argument("--repo", required=True, help="owner/name of the demo repository")
+    demo_run.add_argument("--issues", required=True, help="Markdown file of frozen issue texts")
+    demo_run.add_argument("--fix", required=True, help="Fix files, laid out like the checkout")
+    demo_run.add_argument("--out", required=True, help="Results .jsonl (appended; reruns resume)")
+    demo_run.add_argument("--only", help="Comma-separated issue numbers to run (default: all)")
+    demo_report = demo_commands.add_parser("report", help="Summarise demo results as Markdown")
+    demo_report.add_argument("--repo", required=True, help="owner/name, for issue links")
+    demo_report.add_argument("--results", required=True, help="Results .jsonl from demo run")
+    demo_report.add_argument("--title", default="Demo results")
+    demo_report.add_argument("--out", help="Write Markdown here instead of printing it")
 
     trace_cmd = commands.add_parser("trace", help="Analyse OpenTelemetry span files")
     trace_commands = trace_cmd.add_subparsers(dest="trace_command", required=True)
@@ -99,6 +113,13 @@ def main(argv: list[str] | None = None) -> None:
         _serve(args.host, args.port)
     elif args.command == "dashboard":
         _dashboard(args.run, args.retrieval, args.trace, args.out)
+    elif args.command == "demo":
+        if not ISSUE_REF.match(f"{args.repo}#1"):
+            parser.error("--repo must look like owner/name")
+        if args.demo_command == "run":
+            _demo_run(args.repo, args.issues, args.fix, args.out, args.only)
+        else:
+            _demo_report(args.repo, args.results, args.title, args.out)
     elif args.command == "trace":
         _trace_report(args.trace, args.title, args.out)
     elif args.command == "retrieval":
@@ -159,6 +180,44 @@ def _backtest_run(
     finally:
         if provider is not None:
             provider.shutdown()
+
+
+def _demo_run(repo: str, issues_file: str, fix: str, out: str, only: str | None) -> None:
+    from pathlib import Path
+
+    from .backtest.checkout import prepare_live_checkout
+    from .backtest.demo import parse_issues, run_demo
+    from .backtest.runner import run_prompt_adk
+    from .config import get_settings
+
+    settings = get_settings()
+    issues = parse_issues(Path(issues_file).read_text(encoding="utf-8"))
+    if only:
+        wanted = {int(n) for n in only.split(",")}
+        issues = [i for i in issues if i.number in wanted]
+
+    def prepare(name: str, number: int) -> Path:
+        return prepare_live_checkout(name, number, settings.workspace_root)
+
+    results = run_demo(repo, issues, Path(fix), Path(out), prepare, run_prompt_adk, settings)
+    for r in results:
+        print(
+            f"#{r.issue}: {r.verdict} fail_to_pass={r.fail_to_pass} calls={r.llm_calls} "
+            f"tokens={r.tokens} {r.latency_s}s stopped={r.stopped}"
+        )
+
+
+def _demo_report(repo: str, results: str, title: str, out: str | None) -> None:
+    from pathlib import Path
+
+    from .backtest.demo import load_results, render_markdown
+
+    markdown = render_markdown(load_results(Path(results)), repo, title)
+    if out:
+        Path(out).write_text(markdown, encoding="utf-8")
+        print(f"wrote {out}")
+    else:
+        print(markdown, end="")
 
 
 def _backtest_report(results: str, title: str, out: str | None) -> None:
