@@ -102,7 +102,7 @@ and resume where they stopped.
 
 `backtest run --trace spans.jsonl` records OpenTelemetry spans (ADK's agent, model and tool spans
 plus each case's prepare / agents / fix-check stages). `trace report --trace spans.jsonl` breaks
-them down per agent and per stage. **[Dashboard](docs/index.html)** (all runs side by side):
+them down per agent and per stage. **[Dashboard](https://learn-dumboo24.github.io/issue-to-repro/)** (all runs side by side):
 
 ```bash
 uv run issue-to-repro dashboard \
@@ -150,7 +150,7 @@ Built in phases; each phase lands as one pull request and a tagged release
 | 2. Backtest harness | Replay fixed bugs; score against the real fix. **8/10 Click bugs verified** | ✅ v0.2.0 |
 | 3. Sandbox | Reproductions in a locked-down container; isolation tested in CI | ✅ v0.3.0 |
 | 4. Retrieval | Gemini-embedding code search; right file first 87% vs 52% for keyword search | ✅ v0.4.0 |
-| 5. Observability | OpenTelemetry spans, per-agent cost/latency breakdown, [dashboard](docs/index.html) | ✅ v0.5.0 |
+| 5. Observability | OpenTelemetry spans, per-agent cost/latency breakdown, [dashboard](https://learn-dumboo24.github.io/issue-to-repro/) | ✅ v0.5.0 |
 | 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval; Cloud Trace export | Next |
 | 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
 | 8. Benchmarks | Export fixed issues as verified fail-to-pass agent benchmark tasks | Planned |
