@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from issue_to_repro.backtest.report import load_results, render_markdown, summarize
 
 
@@ -58,3 +60,16 @@ def test_load_results_keeps_latest_row_per_case(tmp_path):
     loaded = load_results(path)
     assert len(loaded) == 4
     assert next(r for r in loaded if r["case_id"] == "o/r#3")["verdict"] == "reproduced"
+
+
+def test_wilson_interval_shows_how_little_a_small_sample_proves():
+    from issue_to_repro.backtest.report import interval_text, wilson_interval
+
+    low, high = wilson_interval(9, 9)
+    assert (round(low, 2), high) == (0.70, 1.0)
+    low, high = wilson_interval(5, 10)
+    assert (round(low, 2), round(high, 2)) == (0.24, 0.76)
+    assert wilson_interval(0, 0) == (0.0, 1.0)
+    assert interval_text((0.7012, 1.0)) == "95% CI 70%–100%"
+    with pytest.raises(ValueError):
+        wilson_interval(3, 2)

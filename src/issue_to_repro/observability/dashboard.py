@@ -65,6 +65,7 @@ def run_summary(run: Run) -> dict[str, Any]:
         "cases": s.cases,
         "verified": s.verified,
         "precision": s.precision,
+        "precision_interval": s.precision_interval,
         "tokens": s.tokens_per_case,
         "p50": s.latency_p50_s,
         "p95": s.latency_p95_s,
@@ -75,16 +76,18 @@ def run_summary(run: Run) -> dict[str, Any]:
 
 def _runs_table(summaries: list[dict[str, Any]]) -> str:
     head = (
-        "<tr><th>Run</th><th>Verified</th><th>Precision</th><th>Tokens / case</th>"
+        "<tr><th>Run</th><th>Verified</th><th>Precision (95% CI)</th><th>Tokens / case</th>"
         "<th>p50 / p95</th><th>Cost</th><th>Cost / verified fix</th></tr>"
     )
     body = []
     for s in summaries:
         cost = "free tier / not priced" if s["cost"] is None else f"≤ ${s['cost']:.2f}"
         per_fix = "–" if s["cost_per_fix"] is None else f"≤ ${s['cost_per_fix']:.3f}"
+        low, high = s["precision_interval"]
         body.append(
             f"<tr><td>{_e(s['label'])}</td><td>{s['verified']} / {s['cases']}</td>"
-            f"<td>{s['precision']:.0%}</td><td>{s['tokens']:,.0f}</td>"
+            f"<td>{s['precision']:.0%} <small>({low:.0%}–{high:.0%})</small></td>"
+            f"<td>{s['tokens']:,.0f}</td>"
             f"<td>{s['p50']:.0f}s / {s['p95']:.0f}s</td><td>{cost}</td><td>{per_fix}</td></tr>"
         )
     return f'<div class="wrap"><table>{head}{"".join(body)}</table></div>'

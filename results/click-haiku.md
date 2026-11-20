@@ -7,7 +7,7 @@
 | Models (coordinator/worker) | claude-haiku-5-5/claude-haiku-5-5 |
 | Cases | 12 |
 | Sandbox said "reproduced" | 9 |
-| ...confirmed by the real fix (precision) | 9 (100%) |
+| ...confirmed by the real fix (precision) | 9 (100%, 95% CI 70%–100%) |
 | Outcomes | reproduced: 9, no_attempt: 2, not_reproduced: 1 |
 | Tokens, total / per case | 863,895 / 71,991 |
 | Latency per case, p50 / p95 | 29s / 30s |

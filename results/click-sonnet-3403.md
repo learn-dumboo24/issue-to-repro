@@ -7,7 +7,7 @@
 | Models (coordinator/worker) | claude-sonnet-5-5/claude-sonnet-5-5 |
 | Cases | 1 |
 | Sandbox said "reproduced" | 1 |
-| ...confirmed by the real fix (precision) | 0 (0%) |
+| ...confirmed by the real fix (precision) | 0 (0%, 95% CI 0%–79%) |
 | Outcomes | reproduced: 1 |
 | Tokens, total / per case | 156,661 / 156,661 |
 | Latency per case, p50 / p95 | 78s / 78s |
