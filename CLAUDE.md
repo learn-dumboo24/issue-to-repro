@@ -11,6 +11,8 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - Backtest (calls Gemini): `uv run issue-to-repro backtest run --dataset datasets/click.jsonl
   --source workspace/_sources/click --out results/<name>.jsonl --issues 3362`, then
   `uv run issue-to-repro backtest report --results results/<name>.jsonl`
+- Model / retrieval switches: `MODEL_PROVIDER=gemini|anthropic`, `COORDINATOR_MODEL`,
+  `WORKER_MODEL`, `RETRIEVAL=keyword|semantic`. Always set `BACKTEST_MAX_USD` for paid models.
 
 ## Gates before every commit
 1. `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest -q`
@@ -36,7 +38,11 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - **Running a repo's tests executes its code.** Only checkouts under `WORKSPACE_ROOT`; only files
   named `test_issue_repro*.py` may be written. Use `SANDBOX=docker` for any repository you don't
   trust; never weaken its flags in `tools/isolation.py` (no network, nobody, read-only, limits).
-- **Secrets** come from env vars or Secret Manager. Never commit `.env` or key files.
+- **Secrets** come from env vars or Secret Manager. Never commit `.env` or key files. Don't
+  `source .env` before runs: settings read the file directly, so keys never reach the
+  environment that sandboxed test code inherits.
+- `CLAUDE_API_BASE_URL` is deliberately not called `ANTHROPIC_BASE_URL`: sandboxes set that
+  variable for their own use, and a same-named setting would silently redirect Claude calls.
 - **Public repositories and public data only.**
 - Gemini model ids live in `config.py`; check current ids before changing them (list them with
   `client.models.list()`). Retired ids return 404 "no longer available to new users".

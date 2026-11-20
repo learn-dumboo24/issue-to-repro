@@ -94,8 +94,33 @@ uv run issue-to-repro backtest run --dataset datasets/click.jsonl \
 uv run issue-to-repro backtest report --results results/click.jsonl --title "Click backtest"
 ```
 
-Runs are capped per case (`BACKTEST_MAX_LLM_CALLS`, `BACKTEST_MAX_TOKENS`), append to the results
-file, and resume where they stopped.
+Runs are capped per case (`BACKTEST_MAX_LLM_CALLS`, `BACKTEST_MAX_TOKENS`) and per run
+(`BACKTEST_MAX_USD`, an upper-bound estimate from published prices), append to the results file,
+and resume where they stopped.
+
+### Models and retrieval
+
+| Setting | Values |
+|---|---|
+| `MODEL_PROVIDER` | `gemini` (default) or `anthropic` (Claude via ADK's `AnthropicLlm`; needs `ANTHROPIC_API_KEY`) |
+| `COORDINATOR_MODEL`, `WORKER_MODEL` | e.g. `gemini-3.8-flash`, `claude-haiku-5-5`, `claude-sonnet-5-5` |
+| `RETRIEVAL` | `keyword` (default) or `semantic`: adds hybrid BM25 + Gemini-embedding code search |
+
+### Results so far (12 Click cases)
+
+| Model | Verified | Tokens / case | p50 latency | Cost |
+|---|---|---|---|---|
+| Gemini 3.1 Flash-Lite | 8 / 12 | 109k | 53s | free tier |
+| Claude Haiku 5.5 | **9 / 12** | 72k | 29s | ≤ $0.11 total |
+
+Precision was 100% for both: every claimed reproduction was confirmed by the real fix. One case
+(#3403) is not reproducible as filed (`datasets/README.md`); on the 9 reproducible bug reports,
+Haiku verified 9 and Flash-Lite 8.
+
+**Retrieval** (31 Click issues): semantic search puts the file the real fix changed first for
+87% of issues, keyword search for 52%. End to end, it did not measurably change reproductions on
+Click ([`results/click-haiku-semantic.md`](results/click-haiku-semantic.md)). Details in
+[`results/`](results/).
 
 ## Roadmap
 
@@ -107,8 +132,8 @@ Built in phases; each phase lands as one pull request and a tagged release
 | 1. Foundation | Agents, verified reproduction runner, CI, typing, coverage gate | ✅ v0.1.0 |
 | 2. Backtest harness | Replay fixed bugs; score against the real fix. **8/10 Click bugs verified** | ✅ v0.2.0 |
 | 3. Sandbox | Reproductions in a locked-down container; isolation tested in CI | ✅ v0.3.0 |
-| 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Next |
-| 5. Observability | ADK OpenTelemetry → Cloud Trace; cost and latency per issue | Planned |
+| 4. Retrieval | Gemini-embedding code search; right file first 87% vs 52% for keyword search | ✅ v0.4.0 |
+| 5. Observability | ADK OpenTelemetry → Cloud Trace; cost and latency per issue | Next |
 | 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval | Planned |
 | 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
 | 8. Benchmarks | Export fixed issues as verified fail-to-pass agent benchmark tasks | Planned |

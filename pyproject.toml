@@ -1,12 +1,13 @@
 [project]
 name = "issue-to-repro"
-version = "0.3.0"
+version = "0.4.0"
 description = "Turns GitHub bug reports into verified failing tests for maintainers. ADK + Gemini + Cloud Run."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=2.11.0",
     "google-adk>=2.14.1",
     "google-genai>=2.34.0",
     "pydantic-settings>=2.16.3",

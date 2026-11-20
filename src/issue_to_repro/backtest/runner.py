@@ -18,6 +18,7 @@ from ..config import Settings, get_settings
 from ..tools.sandbox import rerun_test
 from .checkout import prepare_checkout
 from .dataset import Case
+from .pricing import price_of, worst_case_cost
 
 MAX_REPORT_CHARS = 4_000
 MAX_TRACE_STEPS = 300
@@ -56,6 +57,7 @@ class CaseResult:
     error: str | None = None
     models: str = ""  # "coordinator/worker" model ids, so runs on different models stay apart
     trace: list[str] = field(default_factory=list)
+    cost_usd: float | None = None  # upper-bound estimate (backtest/pricing.py); None if unpriced
 
 
 RunAgents = Callable[[Case, Path, Settings], AgentRun]
@@ -108,6 +110,7 @@ def run_case(case: Case, prepare: Prepare, run_agents: RunAgents, settings: Sett
         final_report=run.final_text[:MAX_REPORT_CHARS],
         models=f"{settings.coordinator_model}/{settings.worker_model}",
         trace=run.trace[:MAX_TRACE_STEPS],
+        cost_usd=_estimate_cost(settings, run.prompt_tokens, run.output_tokens),
     )
 
 
@@ -146,21 +149,44 @@ def run_backtest(
     run_agents = run_agents or run_agents_adk
     out = Path(out_path)
     done = {r["case_id"] for r in map(json.loads, _lines(out)) if not is_retryable(r)}
+    cap = settings.backtest_max_usd
+    worst = worst_case_cost(settings) if cap is not None else 0.0  # raises if a model is unpriced
+    spent = 0.0
     results = []
     for case in cases:
         if case.case_id in done:
             log(f"{case.case_id}: already in {out.name}, skipping")
             continue
+        if cap is not None and spent + worst > cap:
+            log(
+                f"spend cap: ${spent:.2f} spent, a case can cost up to ${worst:.2f}, "
+                f"cap ${cap:.2f}; stopping before {case.case_id}"
+            )
+            break
         result = run_case(case, prepare, run_agents, settings)
         with out.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(asdict(result), ensure_ascii=False) + "\n")
+        cost = f" cost<=${result.cost_usd:.3f}" if result.cost_usd is not None else ""
+        stopped = f" stopped={result.stopped}" if result.stopped else ""
         log(
             f"{case.case_id}: {result.verdict} fail_to_pass={result.fail_to_pass} "
             f"calls={result.llm_calls} tokens={result.prompt_tokens + result.output_tokens} "
-            f"{result.latency_s}s" + (f" stopped={result.stopped}" if result.stopped else "")
+            f"{result.latency_s}s{cost}{stopped}"
         )
         results.append(result)
+        spent += result.cost_usd or 0.0
     return results
+
+
+def _estimate_cost(settings: Settings, prompt_tokens: int, output_tokens: int) -> float | None:
+    """Upper-bound cost, priced at the pricier of the two configured models."""
+    try:
+        prices = [price_of(settings.coordinator_model), price_of(settings.worker_model)]
+    except ValueError:
+        return None
+    rate_in = max(p.input_per_mtok for p in prices)
+    rate_out = max(p.output_per_mtok for p in prices)
+    return (prompt_tokens * rate_in + output_tokens * rate_out) / 1e6
 
 
 def is_retryable(result: dict[str, Any]) -> bool:

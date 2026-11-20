@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from issue_to_repro.backtest.checkout import prepare_checkout, run_checked
 from issue_to_repro.config import Settings
 
 
@@ -67,3 +68,25 @@ def history(tmp_path):
     commit(repo, "Backport: closes #12", {"pkg/core.py": "x = 5\n", "tests/test_core.py": "# t3\n"})
     commit(repo, "Refactor (#99), no fix keyword", {"pkg/core.py": "x = 6\n", "tests/t.py": "2"})
     return repo, base, fix
+
+
+def git_only(command: list[str]) -> None:
+    if command[0] == "git":
+        run_checked(command)  # uv installs are skipped: tests run with this interpreter
+
+
+@pytest.fixture
+def backtest_setup(history, tmp_path, monkeypatch):
+    from test_checkout import make_case  # local import: keeps conftest free of test-module imports
+
+    repo, base, fix = history
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    monkeypatch.setenv("WORKSPACE_ROOT", str(workspace))
+    monkeypatch.setenv("REPRO_RUNS", "2")
+    case = make_case(base, fix)
+
+    def prepare(c):
+        return prepare_checkout(repo, c, workspace, run=git_only)
+
+    return case, prepare, tmp_path / "results.jsonl"
