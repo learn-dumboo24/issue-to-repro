@@ -34,6 +34,20 @@ def read_file_tool(
     return _guard(read_file, repo_dir, path, start_line, end_line or None)
 
 
+def semantic_search_tool(repo_dir: str, query: str) -> dict[str, Any]:
+    """Search a checkout by meaning: describe the behaviour or concept (e.g. "wraps help text at
+    hyphens"). Returns the best-matching functions and classes with file and line ranges. If it
+    reports an error, use search_code_tool instead."""
+    from google.genai import errors
+
+    from ..retrieval.search import semantic_search
+
+    try:
+        return _guard(semantic_search, repo_dir, query)
+    except errors.APIError as exc:  # quota or overload: report it, let the agent fall back
+        return {"status": "error", "error": f"embedding API {exc.code}: {exc.status}"}
+
+
 def run_reproduction_tool(repo_dir: str, test_relpath: str, test_code: str) -> dict[str, Any]:
     """Write a pytest file named test_issue_repro*.py into the checkout and run it several
     times. The verdict is "reproduced" only if it fails, for a real reason, on every run."""

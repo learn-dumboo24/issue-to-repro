@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     # Reproducer <-> verifier rounds before giving up on an issue.
     max_repro_attempts: int = 4
 
+    # "semantic" gives the retriever semantic_search_tool (hybrid BM25 + embeddings) as well as
+    # keyword search; "keyword" (default) keeps it to keyword search and file reading.
+    retrieval: Literal["keyword", "semantic"] = "keyword"
     # Semantic code search (retrieval/): Gemini embeddings, cached on disk by content hash.
     embedding_model: str = "gemini-embedding-2"
     embedding_dims: int = 768
