@@ -4,6 +4,24 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - Phase 3: Docker sandbox
+
+### Added
+- `SANDBOX=docker`: reproduction tests run in a container with no network, as `nobody` with all
+  capabilities dropped and `no-new-privileges`, on a read-only filesystem with read-only mounts,
+  under memory/CPU/process limits and an in-container timeout. Containers left behind after a
+  host-side timeout are force-removed. `SANDBOX=local` remains the default for development.
+- Checkouts for the docker sandbox are built on uv's standalone Python (`PYTHON_INSTALL_DIR`),
+  so nothing is installed inside the container.
+- Real-container integration tests (`pytest -m docker`) and a "Docker sandbox" CI job: a bug
+  reproduces, the network is unreachable, the checkout is read-only.
+- A live backtest in the sandbox (`results/click-docker.md`): 2 of 3 verified; the third was a
+  model error rejected by the real-fix check.
+
+### Fixed
+- Inside `uv run`, uv returned the active project venv instead of the standalone Python; the
+  lookup now ignores `VIRTUAL_ENV` and refuses interpreters outside the install dir.
+
 ## [0.2.0] - Phase 2: Backtest harness
 
 ### Added

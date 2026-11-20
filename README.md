@@ -106,8 +106,8 @@ Built in phases; each phase lands as one pull request and a tagged release
 |---|---|---|
 | 1. Foundation | Agents, verified reproduction runner, CI, typing, coverage gate | ✅ v0.1.0 |
 | 2. Backtest harness | Replay fixed bugs; score against the real fix. **8/10 Click bugs verified** | ✅ v0.2.0 |
-| 3. Sandbox | Reproductions in a locked-down container; isolation tested in CI | In progress |
-| 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Planned |
+| 3. Sandbox | Reproductions in a locked-down container; isolation tested in CI | ✅ v0.3.0 |
+| 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Next |
 | 5. Observability | ADK OpenTelemetry → Cloud Trace; cost and latency per issue | Planned |
 | 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval | Planned |
 | 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
