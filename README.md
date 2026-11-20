@@ -185,13 +185,18 @@ tests with wrong or extra assertions. The [review](results/shadow/review-4481746
 two changes: a test file counts only if every test in it fails, and the agents keep the
 reporter's code layout and assert only behaviour the issue states as expected.
 
+**Second run, same 6 issues, after those changes: 3 of 5 correct as written** (was 1); the two
+mistakes the changes targeted were gone, and the two that remained were instructions the model did
+not follow ([review](results/shadow/review-44820404301.md)). One run each on 5 issues, so a
+signal rather than a measurement.
+
 ## Scope and limitations
 
 - **Python projects tested with pytest** whose test dependencies the installer understands. Bugs
   that need services, networks, GUIs or a particular operating system are out of reach of the
   sandbox; they end as `setup_error`, `invalid` or `not_reproduced`.
-- **Small evaluation so far:** 12 backtest cases from one repository and one shadow run of 5
-  claims. Treat the percentages as indications, with the intervals shown.
+- **Small evaluation so far:** 12 backtest cases from one repository and two shadow runs of 5
+  claims each. Treat the percentages as indications, with the intervals shown.
 - **Contamination:** Click's fixed issues are public, so models may have seen them. The task is to
   write a failing test, not the fix, which lowers but does not remove the risk. Shadow mode uses
   open issues, which no model can have seen fixed.

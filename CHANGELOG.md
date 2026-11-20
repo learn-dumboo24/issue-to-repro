@@ -25,6 +25,10 @@ All notable changes are listed here. The format follows
 - `list_open_issues`: the newest open issues of a repository, pull requests left out.
 - The first shadow run and its review (`results/shadow/`): 5 claimed reproductions on Click,
   Jinja and attrs; 1 correct as written, 2 half right, 1 invalid, 1 premature; none shared.
+- The second shadow run and its review: on the same 6 issues after the changes below, 3 of 5
+  claimed reproductions are correct as written (was 1).
+- `shadow run --skip-tried DIR`: skip issues found in earlier results; the workflow passes
+  `results/shadow`, where reviewed runs are kept.
 - Backtest report and dashboard: a 95% Wilson interval for precision, since a few claims cannot
   show 100%.
 - README: scope and limitations, and how the project compares with related work.
