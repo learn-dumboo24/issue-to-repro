@@ -328,6 +328,18 @@ def test_shadow_cli_runs_selected_issues_and_reports(monkeypatch, checkout, tmp_
     with pytest.raises(SystemExit, match="not in the config"):
         run_cli(monkeypatch, *args, "--repos", "x/y")
 
+    # Issues in earlier runs' results are skipped when --skip-tried points at them.
+    earlier = tmp_path / "earlier"
+    earlier.mkdir()
+    (earlier / "run-1.jsonl").write_text(json.dumps({"repo": "o/r", "issue": 1}) + "\n")
+    fresh = tmp_path / "fresh.jsonl"
+    fresh_args = ["shadow", "run", "--config", str(config), "--out", str(fresh)]
+    run_cli(monkeypatch, *fresh_args, "--repos", "o/r", "--skip-tried", str(earlier))
+    printed = capsys.readouterr().out
+    assert "skipping 1 issues tried before" in printed and "o/r: []" in printed
+    with pytest.raises(SystemExit, match="no such folder"):
+        run_cli(monkeypatch, *fresh_args, "--skip-tried", str(tmp_path / "missing"))
+
 
 def test_shadow_cli_refuses_without_docker_and_empty_reports(monkeypatch, tmp_path):
     with pytest.raises(SystemExit, match="SANDBOX=docker"):
