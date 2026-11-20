@@ -56,6 +56,18 @@ def build_parser() -> argparse.ArgumentParser:
     trace_report.add_argument("--title", default="Trace report")
     trace_report.add_argument("--out", help="Write Markdown here instead of printing it")
 
+    dash = commands.add_parser("dashboard", help="Render an HTML dashboard from results")
+    dash.add_argument(
+        "--run",
+        action="append",
+        required=True,
+        metavar="LABEL=RESULTS.jsonl",
+        help="A backtest results file and its label; repeat for each run",
+    )
+    dash.add_argument("--retrieval", help="Rows from retrieval benchmark (.jsonl)")
+    dash.add_argument("--trace", help="Span file to show the per-agent breakdown for")
+    dash.add_argument("--out", required=True, help="Output .html")
+
     retrieval = commands.add_parser("retrieval", help="Code retrieval")
     retrieval_commands = retrieval.add_subparsers(dest="retrieval_command", required=True)
     bench = retrieval_commands.add_parser(
@@ -79,6 +91,8 @@ def main(argv: list[str] | None = None) -> None:
         _reproduce(match["repo"], int(match["number"]), args.checkout, args.dry_run)
     elif args.command == "dataset":
         _dataset_build(args.repo, args.checkout, args.since, args.out)
+    elif args.command == "dashboard":
+        _dashboard(args.run, args.retrieval, args.trace, args.out)
     elif args.command == "trace":
         _trace_report(args.trace, args.title, args.out)
     elif args.command == "retrieval":
@@ -152,6 +166,31 @@ def _backtest_report(results: str, title: str, out: str | None) -> None:
         print(f"wrote {out}")
     else:
         print(markdown, end="")
+
+
+def _dashboard(runs: list[str], retrieval: str | None, trace_path: str | None, out: str) -> None:
+    import json
+    from pathlib import Path
+
+    from .backtest.report import load_results
+    from .observability.dashboard import Run, render
+    from .observability.tracing import load_spans
+
+    parsed = []
+    for item in runs:
+        label, sep, path = item.partition("=")
+        if not sep or not label or not path:
+            raise SystemExit(f"--run must look like LABEL=results.jsonl, got {item!r}")
+        parsed.append(Run(label, load_results(path)))
+    retrieval_rows = (
+        [json.loads(line) for line in Path(retrieval).read_text().splitlines() if line.strip()]
+        if retrieval
+        else None
+    )
+    spans = load_spans(trace_path) if trace_path else None
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    Path(out).write_text(render(parsed, retrieval_rows, spans), encoding="utf-8")
+    print(f"wrote {out}")
 
 
 def _trace_report(trace_path: str, title: str, out: str | None) -> None:
