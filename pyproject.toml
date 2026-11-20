@@ -1,6 +1,6 @@
 [project]
 name = "issue-to-repro"
-version = "0.3.0"
+version = "0.4.0"
 description = "Turns GitHub bug reports into verified failing tests for maintainers. ADK + Gemini + Cloud Run."
 readme = "README.md"
 license = "Apache-2.0"

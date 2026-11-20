@@ -4,6 +4,35 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - Phase 4: Retrieval, model providers and cost control
+
+### Added
+- Semantic code retrieval: AST chunks (functions, methods, class headers), `gemini-embedding-2`
+  vectors cached on disk by content hash, a cosine index, and a rate limiter that keeps embedding
+  requests under the per-minute quota.
+- `retrieval benchmark`: keyword (BM25) vs semantic vs hybrid search, scored on whether each
+  surfaces the files the real fix changed. On 31 Click issues, semantic search ranks the right
+  file first 87% of the time vs 52% for keyword search (MRR 0.92 vs 0.70).
+- `semantic_search_tool` for the retriever (`RETRIEVAL=semantic`); embedding failures come back as
+  an error result so the agent falls back to keyword search.
+- `MODEL_PROVIDER=anthropic`: Claude via ADK's `AnthropicLlm` and the official Anthropic SDK.
+- `BACKTEST_MAX_USD`: a run-wide spend cap from published prices; each result records its
+  estimated cost.
+- Cross-model results on the same 12 Click cases: Gemini 3.1 Flash-Lite 8/12, Claude Haiku 5.5
+  9/12 (≤ $0.11), Claude Sonnet 5.5 0/1 on the case both missed.
+
+### Found
+- `pallets/click#3403` is not reproducible as filed: the issue's snippet already behaves as the
+  reporter asked at the buggy commit. On the 9 reproducible bug reports, Haiku verified 9/9.
+- Semantic retrieval did not measurably change end-to-end reproductions on Click (one run, 12
+  cases); see `results/click-haiku-semantic.md`.
+
+### Fixed
+- `gemini-embedding-2` merged a plain list of strings into one embedding; texts are now sent as
+  separate `Content` items, with a count check.
+- A setting named `anthropic_base_url` was filled from a sandbox's own `ANTHROPIC_BASE_URL`; it is
+  now `CLAUDE_API_BASE_URL`.
+
 ## [0.3.0] - Phase 3: Docker sandbox
 
 ### Added
