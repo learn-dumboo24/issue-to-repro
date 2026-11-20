@@ -130,9 +130,13 @@ To host it, enable GitHub Pages for the `docs/` folder on `main` (Settings → P
 | Gemini 3.1 Flash-Lite | 8 / 12 | 109k | 53s | free tier |
 | Claude Haiku 5.5 | **9 / 12** | 72k | 29s | ≤ $0.11 total |
 
-Precision was 100% for both: every claimed reproduction was confirmed by the real fix. One case
-(#3403) is not reproducible as filed (`datasets/README.md`); on the 9 reproducible bug reports,
-Haiku verified 9 and Flash-Lite 8.
+In both runs every reproduction the sandbox claimed was confirmed by the real fix: 9 of 9 for
+Haiku and 8 of 8 for Flash-Lite. With so few claims that is a 95% confidence interval of about
+70–100%, not proof of 100%. Other runs did make false claims (8 of 9 confirmed in an earlier
+Flash-Lite run, 10 of 11 with semantic search, 2 of 3 in a short Docker run), and the fix check
+rejected them, so every result reported as *verified* has passed it. One case (#3403) is not
+reproducible as filed (`datasets/README.md`); on the 9 reproducible bug reports, Haiku verified
+9 and Flash-Lite 8.
 
 **Retrieval** (31 Click issues): semantic search puts the file the real fix changed first for
 87% of issues, keyword search for 52%. End to end, it did not measurably change reproductions on
@@ -174,6 +178,42 @@ Typer) and keeps the results for review; **nothing is posted**. A manually start
 it on GitHub Actions in the Docker sandbox and pushes the results to a review branch. A person
 checks each reproduction before offering it to the maintainers. Selection rules, the review
 checklist and the safety design are in [`shadow/README.md`](shadow/README.md).
+
+**First run (5 claimed reproductions on Click, Jinja and attrs): 1 correct as written, 2 half
+right, 1 invalid, 1 premature; none shared.** Without a fix to check against, the sandbox accepted
+tests with wrong or extra assertions. The [review](results/shadow/review-44817467356.md) led to
+two changes: a test file counts only if every test in it fails, and the agents keep the
+reporter's code layout and assert only behaviour the issue states as expected.
+
+## Scope and limitations
+
+- **Python projects tested with pytest** whose test dependencies the installer understands. Bugs
+  that need services, networks, GUIs or a particular operating system are out of reach of the
+  sandbox; they end as `setup_error`, `invalid` or `not_reproduced`.
+- **Small evaluation so far:** 12 backtest cases from one repository and one shadow run of 5
+  claims. Treat the percentages as indications, with the intervals shown.
+- **Contamination:** Click's fixed issues are public, so models may have seen them. The task is to
+  write a failing test, not the fix, which lowers but does not remove the risk. Shadow mode uses
+  open issues, which no model can have seen fixed.
+
+## How this compares
+
+Writing a reproduction test from an issue is an active research area, with benchmarks such as
+SWT-Bench and TDD-Bench Verified, and general coding agents (GitHub Copilot's coding agent, Devin,
+SWE-agent) write tests while fixing issues. The results above are not comparable to published
+benchmark scores; that would need a run on their task sets. What this project focuses on is what
+surrounds the model:
+
+- **Nothing unverified is claimed.** The verdict comes from the sandbox, never from model text; a
+  backtest result counts only if the real fix makes the test pass, and the report shows the
+  confidence interval.
+- **Built for untrusted input:** issue text is treated as data, tests run in a locked-down
+  container, and live issues are refused outside it.
+- **A maintainer approves every comment**, and shadow mode posts nothing.
+- **It measures itself:** backtests against real fixes, cost and latency per case, tracing, and
+  shadow runs on open issues with a written review.
+- **Every verified result is also an eval task** ([benchmark](bench/README.md)), re-proved
+  without a model in CI.
 
 ## Roadmap
 
