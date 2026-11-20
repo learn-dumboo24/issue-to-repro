@@ -4,6 +4,15 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `demo run` / `demo report`: run the agents on filed issues whose bugs have reference fixes, and
+  check each reproduction fails on the shipped code and passes with the fix. A demo repository,
+  [issue-to-repro-demo](https://github.com/learn-dumboo24/issue-to-repro-demo), has four planted
+  bugs and one feature request; on Gemini 3.1 Flash-Lite all four bugs were verified and the
+  feature request got no test ([`results/demo-flash-lite.md`](results/demo-flash-lite.md)).
+
 ## [0.5.0] - Phase 5: Observability
 
 ### Added
