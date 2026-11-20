@@ -153,7 +153,10 @@ def _retrieval_benchmark(
     out_path = Path(out)
     done = {json.loads(line)["case_id"] for line in _nonempty_lines(out_path)}
     snapshots = Path(settings.workspace_root) / "_snapshots"
-    for case in read_jsonl(dataset):
+    # Newest first: recent versions share most code with each other, so the embedding cache
+    # covers more of each case and a daily quota goes further.
+    cases = sorted(read_jsonl(dataset), key=lambda c: c.committed_at, reverse=True)
+    for case in cases:
         if case.committed_at < since or case.case_id in done:
             continue
         row = benchmark.evaluate_case(
