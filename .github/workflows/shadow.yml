@@ -1,0 +1,119 @@
+name: Shadow run
+
+# Runs the agents on recent open bug reports of the repositories in shadow/config.json and pushes
+# the results to a review branch. Nothing is posted to those repositories.
+#
+# Two jobs, so no job holds both a write token and the model key:
+# - reproduce: read-only token and the Gemini key. Agent-written tests run only in the Docker
+#   sandbox (no network, no credentials).
+# - publish: write access, no model key, runs no code from other repositories.
+on:
+  workflow_dispatch:
+    inputs:
+      per_repo:
+        description: "Issues to try per repository"
+        default: "2"
+      repos:
+        description: "Comma-separated subset of shadow/config.json repos (empty: all)"
+        default: ""
+      model:
+        description: "Gemini model for every agent"
+        default: "gemini-3.1-flash-lite"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shadow
+  cancel-in-progress: false
+
+jobs:
+  reproduce:
+    name: Reproduce open issues (Docker sandbox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      has_results: ${{ steps.report.outputs.has_results }}
+    env:
+      RUN_NAME: shadow-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving v10 tag upstream; pin exact
+        with:
+          enable-cache: true
+      - name: Check the Gemini key is configured
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "::error::Add a GOOGLE_API_KEY repository secret (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Pull the sandbox image
+        run: docker pull -q mirror.gcr.io/library/debian:bookworm-slim
+      - name: Shadow run
+        env:
+          SANDBOX: docker
+          PYTHON_INSTALL_DIR: ${{ runner.temp }}/uv-python
+          PYTHONDONTWRITEBYTECODE: "1"
+          MODEL_PROVIDER: gemini
+          GOOGLE_GENAI_USE_VERTEXAI: "false"
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}  # read-only; raises the API rate limit for listing
+          COORDINATOR_MODEL: ${{ inputs.model }}
+          WORKER_MODEL: ${{ inputs.model }}
+          PER_REPO: ${{ inputs.per_repo }}
+          REPOS: ${{ inputs.repos }}
+        run: |
+          mkdir -p results/shadow
+          args=(--config shadow/config.json --out "results/shadow/$RUN_NAME.jsonl" --per-repo "$PER_REPO")
+          if [ -n "$REPOS" ]; then args+=(--repos "$REPOS"); fi
+          uv run issue-to-repro shadow run "${args[@]}"
+      - name: Report
+        id: report
+        run: |
+          if [ ! -s "results/shadow/$RUN_NAME.jsonl" ]; then
+            echo "No open issue matched the selection rules; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          uv run issue-to-repro shadow report --results "results/shadow/$RUN_NAME.jsonl" \
+            --title "Shadow run $RUN_NAME" --out "results/shadow/$RUN_NAME.md"
+          cat "results/shadow/$RUN_NAME.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "has_results=true" >> "$GITHUB_OUTPUT"
+      - if: steps.report.outputs.has_results == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: shadow-results
+          path: results/shadow/
+          if-no-files-found: error
+
+  publish:
+    name: Push results to a review branch
+    needs: reproduce
+    if: needs.reproduce.outputs.has_results == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      BRANCH: shadow/run-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: shadow-results
+          path: results/shadow/
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add results/shadow/
+          git commit -m "Shadow run ${{ github.run_id }} results (unreviewed)"
+          git push origin "$BRANCH"
+          echo "Results on branch $BRANCH" >> "$GITHUB_STEP_SUMMARY"

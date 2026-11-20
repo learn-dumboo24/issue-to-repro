@@ -1,0 +1,5 @@
+{
+  "repos": ["pallets/click", "pallets/jinja", "python-attrs/attrs", "fastapi/typer"],
+  "per_repo": 2,
+  "max_age_days": 120
+}
