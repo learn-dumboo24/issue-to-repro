@@ -1,0 +1,60 @@
+name: Benchmark tasks
+
+# Re-proves every exported task in the Docker sandbox: the test must fail at the buggy commit and
+# pass once the maintainers' fix is applied. No model is called, so no secrets are needed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bench/**"
+      - "src/issue_to_repro/bench/**"
+      - "src/issue_to_repro/tools/**"
+      - "src/issue_to_repro/backtest/checkout.py"
+      - ".github/workflows/bench.yml"
+  pull_request:
+    paths:
+      - "bench/**"
+      - "src/issue_to_repro/bench/**"
+      - "src/issue_to_repro/tools/**"
+      - "src/issue_to_repro/backtest/checkout.py"
+      - ".github/workflows/bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify benchmark tasks (Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving v10 tag upstream; pin exact
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Pull the sandbox image
+        run: docker pull -q mirror.gcr.io/library/debian:bookworm-slim
+      - name: Clone pallets/click
+        run: git clone --quiet --filter=blob:none https://github.com/pallets/click workspace/_sources/click
+      - name: Verify every task in the Docker sandbox
+        env:
+          SANDBOX: docker
+          PYTHON_INSTALL_DIR: ${{ runner.temp }}/uv-python
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          uv run issue-to-repro bench verify --tasks bench/click.jsonl \
+            --source workspace/_sources/click --out bench-checks.jsonl
+      - name: Upload the per-task checks
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-checks
+          path: bench-checks.jsonl
+          if-no-files-found: ignore

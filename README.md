@@ -158,6 +158,15 @@ On Gemini 3.1 Flash-Lite (free tier) all four bugs were verified and the feature
 classified as such, with no test written: 6–9 model calls and 11k–25k tokens per issue
 ([`results/demo-flash-lite.md`](results/demo-flash-lite.md)).
 
+### Benchmark tasks
+
+Every verified reproduction is also a reusable eval task: the issue as filed, the buggy commit, a
+test that fails there, and the maintainers' fix that makes it pass. `bench export` writes them;
+`bench verify` re-proves each one from scratch, with no model, and CI does the same in the Docker
+sandbox. [`bench/click.jsonl`](bench/click.jsonl) has **10 tasks from Click, all re-verified**;
+the [datasheet](bench/README.md) covers the fields, how to evaluate a fixing agent, and the
+limitations.
+
 ## Roadmap
 
 Built in phases; each phase lands as one pull request and a tagged release
