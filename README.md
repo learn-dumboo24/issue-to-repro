@@ -18,17 +18,18 @@ task, so the project doubles as a generator of real-world evals for coding agent
 ## Architecture
 
 ```
-coordinator (ADK LlmAgent, Gemini)
+coordinator (ADK SequentialAgent: fixed order)
 ├── retriever   reads the issue, searches the code      tools: fetch_issue, search_code
 ├── classifier  bug / question / feature / duplicate / needs-info
-└── repro_loop  (ADK LoopAgent: self-reflection)
-    ├── reproducer  writes + runs a failing test        tool: run_reproduction
-    └── verifier    accepts only genuine reproductions  tool: exit_loop
+├── repro_loop  (ADK LoopAgent: self-reflection)
+│   ├── reproducer  writes + runs a failing test        tools: run_reproduction, exit_loop
+│   └── verifier    accepts only genuine reproductions  tool: exit_loop
+└── reporter    short report for the maintainer
 ```
 
 | Piece | Google stack |
 |---|---|
-| Multi-agent, hierarchical delegation, self-reflection loop | Agent Development Kit (ADK) + Gemini |
+| Multi-agent pipeline with hierarchical delegation and a self-reflection loop | Agent Development Kit (ADK) + Gemini |
 | Retrieval over code, docs, closed issues, commits | keyword baseline now → Vertex AI embeddings + vector search |
 | Sandboxed test runs | local runner now → Cloud Run jobs |
 | GitHub webhook service | Cloud Run |
@@ -45,7 +46,7 @@ that it fails for the reason the issue describes.
 ```bash
 uv sync
 uv run pytest               # never calls Gemini or the network
-uv run issue-to-repro owner/name#123 --checkout workspace/name --dry-run
+uv run issue-to-repro reproduce owner/name#123 --checkout workspace/name --dry-run
 ```
 
 To run the agents for real, set Gemini credentials (see `.env.example`), clone the target repo
@@ -53,6 +54,30 @@ under `workspace/`, and drop `--dry-run`. `uv run adk web src` opens the ADK dev
 
 > **Security:** until the Cloud Run sandbox lands, reproductions execute the target repo's code
 > on your machine. Only use trusted repositories.
+
+## Backtesting
+
+How well does it work? The backtest replays bugs that were already fixed and checks the
+agents' tests against the real fix:
+
+1. **Dataset** (`datasets/`): `issue-to-repro dataset build` mines commits that close exactly one
+   issue and change both source and tests, and freezes each issue's title and body (comments
+   are left out because they often reveal the fix). CI builds datasets from `datasets/sources.json`.
+2. **Run**: for each case, a git worktree at the buggy commit gets its own virtualenv; the agents
+   see only the frozen issue text and the checkout.
+3. **Score**: a case is a *verified reproduction* only if the agents' test fails on the buggy
+   commit **and passes once the real fix is applied**. The verdict comes from the sandbox, never
+   from model text.
+
+```bash
+git clone --filter=blob:none https://github.com/pallets/click workspace/_sources/click
+uv run issue-to-repro backtest run --dataset datasets/click.jsonl \
+  --source workspace/_sources/click --out results/click.jsonl --limit 10
+uv run issue-to-repro backtest report --results results/click.jsonl --title "Click backtest"
+```
+
+Runs are capped per case (`BACKTEST_MAX_LLM_CALLS`, `BACKTEST_MAX_TOKENS`), append to the results
+file, and resume where they stopped.
 
 ## Roadmap
 
@@ -62,8 +87,8 @@ Built in phases; each phase lands as one pull request and a tagged release
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Foundation | Agents, verified reproduction runner, CI, typing, coverage gate | ✅ v0.1.0 |
-| 2. Backtest harness | Replay closed issues with a linked fix; measure reproduction rate | Next |
-| 3. Sandbox | Run reproductions in Docker, then Cloud Run jobs | Planned |
+| 2. Backtest harness | Replay fixed bugs; score against the real fix. **8/10 Click bugs verified** | ✅ v0.2.0 |
+| 3. Sandbox | Run reproductions in Docker, then Cloud Run jobs | Next |
 | 4. Retrieval | Vertex AI embeddings + vector search, measured against keyword search | Planned |
 | 5. Observability | ADK OpenTelemetry → Cloud Trace; cost and latency per issue | Planned |
 | 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval | Planned |

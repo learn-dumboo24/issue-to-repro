@@ -4,6 +4,7 @@ SECURITY: this executes the target repository's code on this machine. Until the 
 Cloud Run job sandbox lands, only point it at repositories you trust.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -71,7 +72,6 @@ def run_reproduction(repo_dir: str, test_relpath: str, test_code: str) -> dict[s
 
     `test_relpath` must be a repo-relative file named test_issue_repro*.py.
     """
-    settings = get_settings()
     root = resolve_checkout(repo_dir)
     target = (root / test_relpath).resolve()
     if root not in target.parents or not TEST_NAME.match(target.name):
@@ -80,7 +80,22 @@ def run_reproduction(repo_dir: str, test_relpath: str, test_code: str) -> dict[s
         )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(test_code, encoding="utf-8")
+    return _run_repeatedly(root, target)
 
+
+def rerun_test(repo_dir: str, test_relpath: str) -> dict[str, Any]:
+    """Run an existing reproduction test again (e.g. after applying the real fix)."""
+    root = resolve_checkout(repo_dir)
+    target = (root / test_relpath).resolve()
+    if root not in target.parents or not TEST_NAME.match(target.name) or not target.is_file():
+        raise ValueError(
+            f"{test_relpath!r} is not an existing test_issue_repro*.py in the checkout"
+        )
+    return _run_repeatedly(root, target)
+
+
+def _run_repeatedly(root: Path, target: Path) -> dict[str, Any]:
+    settings = get_settings()
     outcomes: list[RunOutcome] = []
     output = ""
     for _ in range(settings.repro_runs):
@@ -96,12 +111,26 @@ def run_reproduction(repo_dir: str, test_relpath: str, test_code: str) -> dict[s
     }
 
 
+def _python_for(root: Path) -> str:
+    """Prefer the checkout's own virtualenv (see backtest.checkout); else this interpreter."""
+    venv_python = root / ".venv" / "bin" / "python"
+    return str(venv_python) if venv_python.exists() else sys.executable
+
+
 def _run_once(root: Path, target: Path, timeout_s: int) -> tuple[RunOutcome, str]:
-    command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(target)]
+    command = [_python_for(root), "-m", "pytest", "-q", "-p", "no:cacheprovider", str(target)]
     try:
         # check=False: a failing test is an expected outcome, classified below.
         done = subprocess.run(
-            command, check=False, cwd=root, capture_output=True, text=True, timeout=timeout_s
+            command,
+            check=False,
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            # No bytecode cache: after the fix is applied, a same-size source file edited within
+            # the same second would otherwise run from stale .pyc files.
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         )
     except subprocess.TimeoutExpired as exc:
         partial = exc.stdout or ""

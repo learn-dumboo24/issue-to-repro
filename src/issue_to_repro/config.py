@@ -19,13 +19,22 @@ class Settings(BaseSettings):
     coordinator_model: str = "gemini-3.8-flash"
     worker_model: str = "gemini-3.8-flash"
 
+    # Retries with exponential backoff on overload / rate-limit / server errors (429, 5xx).
+    model_retry_attempts: int = 6
+
     # Only checkouts under this directory may be searched or have tests run in them.
     workspace_root: str = "workspace"
+    # Hard cap on the retriever's tool calls per run (it over-searched when only instructed).
+    retriever_max_tool_calls: int = 8
     # A reproduction must fail on every one of these runs to count (flakiness guard).
     repro_runs: int = 3
     test_timeout_s: int = 120
     # Reproducer <-> verifier rounds before giving up on an issue.
     max_repro_attempts: int = 4
+
+    # Hard per-case limits for backtests (Google Cloud billing has no automatic spending cap).
+    backtest_max_llm_calls: int = 40
+    backtest_max_tokens: int = 400_000
 
     # Optional; raises GitHub's API rate limit. Public issues work without it.
     github_token: SecretStr | None = None

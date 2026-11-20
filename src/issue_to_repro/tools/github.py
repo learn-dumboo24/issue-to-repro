@@ -38,5 +38,6 @@ def parse_issue(data: dict[str, Any]) -> dict[str, Any]:
         "body_truncated": len(body) > MAX_BODY_CHARS,
         "labels": [label["name"] for label in data.get("labels", [])],
         "state": data["state"],
+        "created_at": data.get("created_at", ""),
         "is_pull_request": "pull_request" in data,
     }

@@ -1,0 +1,51 @@
+name: Build datasets
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - datasets/sources.json
+      - .github/workflows/datasets.yml
+
+permissions:
+  contents: write  # commits the built datasets back to the branch
+  issues: read
+
+jobs:
+  build:
+    name: Build backtest datasets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving v10 tag upstream; pin exact
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --frozen
+      - name: Build each dataset in sources.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # read-only; public issues only
+        run: |
+          mkdir -p out sources
+          jq -c '.[]' datasets/sources.json | while read -r src; do
+            repo=$(jq -r .repo <<<"$src"); since=$(jq -r .since <<<"$src"); name=$(jq -r .name <<<"$src")
+            git clone --quiet --filter=blob:none --no-checkout "https://github.com/$repo.git" "sources/$name"
+            uv run issue-to-repro dataset build --repo "$repo" --checkout "sources/$name" \
+              --since "$since" --out "out/$name.jsonl"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: datasets
+          path: out/*.jsonl
+          if-no-files-found: error
+      - name: Commit datasets
+        # Pushes made with GITHUB_TOKEN do not trigger workflows, so this cannot loop.
+        run: |
+          cp out/*.jsonl datasets/
+          git add datasets/*.jsonl
+          if git diff --cached --quiet; then echo "datasets unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Rebuild backtest datasets from sources.json" -m "Built by run ${{ github.run_id }}."
+          git push origin "HEAD:${GITHUB_REF_NAME}"

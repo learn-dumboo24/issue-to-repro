@@ -7,7 +7,10 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - Lint: `uv run ruff check .` (format: `uv run ruff format .`)
 - Type check: `uv run mypy` (strict, on `src/`)
 - Test: `uv run pytest -q`
-- Dry run: `uv run issue-to-repro owner/name#1 --checkout workspace/name --dry-run`
+- Dry run: `uv run issue-to-repro reproduce owner/name#1 --checkout workspace/name --dry-run`
+- Backtest (calls Gemini): `uv run issue-to-repro backtest run --dataset datasets/click.jsonl
+  --source workspace/_sources/click --out results/<name>.jsonl --issues 3362`, then
+  `uv run issue-to-repro backtest report --results results/<name>.jsonl`
 
 ## Gates before every commit
 1. `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest -q`
@@ -15,13 +18,15 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 2. New behaviour comes with a test. Tools must be testable without network or Gemini:
    put logic in plain functions, keep the ADK wrappers in `tools/__init__.py` thin.
 3. Never report a reproduction the runner did not produce. The verdict comes from
-   `tools/sandbox.py`, never from model text.
+   `tools/sandbox.py`, never from model text. Backtest numbers come from `backtest report`.
 
 ## Layout
 - `src/issue_to_repro/agents.py`: agent hierarchy and instructions
 - `src/issue_to_repro/tools/`: deterministic tools (sandbox runner, code search, GitHub)
 - `src/issue_to_repro/config.py`: all settings, via env vars / `.env`
-- `tests/`: pytest; `conftest.py` builds a tiny buggy repo in a temp workspace
+- `src/issue_to_repro/backtest/`: mining, dataset, checkout, runner, report
+- `datasets/`: frozen backtest datasets (built by CI from `sources.json`); `results/`: run outputs
+- `tests/`: pytest; `conftest.py` builds a tiny buggy repo and a small git history
 
 ## Rules that matter here
 - **No silent failures.** A swallowed error in the runner becomes a false "reproduced". Tool
@@ -35,8 +40,10 @@ Python 3.12, managed with **uv**. Google ADK agents on Gemini; target deploy is 
 - **Public repositories and public data only.**
 - Gemini model ids live in `config.py`; check current ids before changing them (list them with
   `client.models.list()`). Retired ids return 404 "no longer available to new users".
-- ADK warns `LoopAgent` is deprecated for `Workflow`, but a `Workflow` cannot yet be an
-  `LlmAgent` sub-agent. Keep `LoopAgent` until ADK allows that, then migrate `repro_loop`.
+- ADK warns `SequentialAgent` and `LoopAgent` are deprecated for `Workflow`. They work today;
+  migrating `coordinator` and `repro_loop` to `Workflow` is a planned, separate change.
+- The pipeline order is fixed on purpose. Model-driven `transfer_to_agent` hand-offs failed in
+  live runs (ended after classification, or looped to the call limit). Don't reintroduce them.
 
 ## Review agents
 `.claude/agents/` has four reviewers copied unchanged from ECC (github.com/affaan-m/ECC @ 3f14a10,

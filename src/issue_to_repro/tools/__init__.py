@@ -4,7 +4,7 @@ instead of crashing the run; nothing is swallowed silently."""
 from collections.abc import Callable
 from typing import Any
 
-from .code_search import search_code
+from .code_search import read_file, search_code
 from .github import fetch_issue
 from .sandbox import run_reproduction
 
@@ -24,6 +24,14 @@ def fetch_issue_tool(repo: str, number: int) -> dict[str, Any]:
 def search_code_tool(repo_dir: str, query: str) -> dict[str, Any]:
     """Search a checked-out repository for a keyword; returns matching file/line/text hits."""
     return _guard(search_code, repo_dir, query)
+
+
+def read_file_tool(
+    repo_dir: str, path: str, start_line: int = 1, end_line: int = 0
+) -> dict[str, Any]:
+    """Read numbered lines of a file in the checkout (at most 200 per call). `path` is relative to
+    the checkout root; end_line 0 means "as far as the limit allows"."""
+    return _guard(read_file, repo_dir, path, start_line, end_line or None)
 
 
 def run_reproduction_tool(repo_dir: str, test_relpath: str, test_code: str) -> dict[str, Any]:
