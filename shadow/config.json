@@ -1,5 +1,12 @@
 {
-  "repos": ["pallets/click", "pallets/jinja", "python-attrs/attrs", "fastapi/typer"],
+  "repos": [
+    "pallets/click",
+    "pallets/jinja",
+    "python-attrs/attrs",
+    "fastapi/typer",
+    "pallets/flask",
+    "more-itertools/more-itertools"
+  ],
   "per_repo": 2,
   "max_age_days": 120
 }
