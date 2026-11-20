@@ -72,14 +72,26 @@ def prepare_checkout(
     With SANDBOX=docker the virtualenv is built on uv's standalone Python; otherwise on any
     Python `PYTHON_VERSION` uv can find.
     """
+    target = checkout_dir(case, workspace_root)
+    return prepare_worktree(source, case.base_commit, target, python, run)
+
+
+def prepare_worktree(
+    source: str | Path,
+    commit: str,
+    target: str | Path,
+    python: str | None = None,
+    run: Runner = run_checked,
+) -> Path:
+    """Create (or recreate) a worktree of `source` at `commit` in `target`, with its own venv."""
     if python is None:
         docker = get_settings().sandbox == "docker"
         python = standalone_python() if docker else PYTHON_VERSION
-    target = checkout_dir(case, workspace_root).resolve()
+    target = Path(target).resolve()
     git = ["git", "-C", str(source)]
     if target.exists():
         run([*git, "worktree", "remove", "--force", str(target)])
-    run([*git, "worktree", "add", "--detach", "--force", str(target), case.base_commit])
+    run([*git, "worktree", "add", "--detach", "--force", str(target), commit])
     install_env(target, python, run)
     return target
 
