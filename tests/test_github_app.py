@@ -45,9 +45,9 @@ def app(api: FakeGitHubAPI, now: float = NOW) -> GitHubApp:
 
 def test_app_jwt_is_rs256_with_short_lifetime():
     token = app(FakeGitHubAPI()).app_jwt()
-    claims = jwt.decode(
-        token, KEY.public_key(), algorithms=["RS256"], options={"verify_exp": False}
-    )
+    # The fixed test clock is in the future, so time checks are off; only the claims matter here.
+    no_time_checks = {"verify_exp": False, "verify_iat": False}
+    claims = jwt.decode(token, KEY.public_key(), algorithms=["RS256"], options=no_time_checks)
     assert claims == {"iat": int(NOW) - 60, "exp": int(NOW) + 540, "iss": "12345"}
 
 
