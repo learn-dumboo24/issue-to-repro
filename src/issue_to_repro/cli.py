@@ -63,6 +63,28 @@ def build_parser() -> argparse.ArgumentParser:
     demo_report.add_argument("--title", default="Demo results")
     demo_report.add_argument("--out", help="Write Markdown here instead of printing it")
 
+    bench_cmd = commands.add_parser("bench", help="Benchmark tasks from verified reproductions")
+    bench_commands = bench_cmd.add_subparsers(dest="bench_command", required=True)
+    bench_export = bench_commands.add_parser(
+        "export", help="Write one task per verified reproduction (no model calls)"
+    )
+    bench_export.add_argument("--dataset", required=True, help="Dataset .jsonl the runs used")
+    bench_export.add_argument("--source", required=True, help="Full clone of the repository")
+    bench_export.add_argument(
+        "--results",
+        action="append",
+        required=True,
+        help="Backtest results .jsonl; repeat to merge runs (earlier files win per issue)",
+    )
+    bench_export.add_argument("--out", required=True, help="Tasks .jsonl")
+    bench_verify = bench_commands.add_parser(
+        "verify", help="Re-prove each task: fails at base, passes with the fix (no model calls)"
+    )
+    bench_verify.add_argument("--tasks", required=True, help="Tasks .jsonl")
+    bench_verify.add_argument("--source", required=True, help="Full clone of the repository")
+    bench_verify.add_argument("--only", help="Comma-separated issue numbers (default: all)")
+    bench_verify.add_argument("--out", help="Also write per-task checks here (.jsonl)")
+
     trace_cmd = commands.add_parser("trace", help="Analyse OpenTelemetry span files")
     trace_commands = trace_cmd.add_subparsers(dest="trace_command", required=True)
     trace_report = trace_commands.add_parser("report", help="Per-agent / per-case breakdown")
@@ -120,6 +142,11 @@ def main(argv: list[str] | None = None) -> None:
             _demo_run(args.repo, args.issues, args.fix, args.out, args.only)
         else:
             _demo_report(args.repo, args.results, args.title, args.out)
+    elif args.command == "bench":
+        if args.bench_command == "export":
+            _bench_export(args.dataset, args.source, args.results, args.out)
+        else:
+            _bench_verify(args.tasks, args.source, args.only, args.out)
     elif args.command == "trace":
         _trace_report(args.trace, args.title, args.out)
     elif args.command == "retrieval":
@@ -218,6 +245,48 @@ def _demo_report(repo: str, results: str, title: str, out: str | None) -> None:
         print(f"wrote {out}")
     else:
         print(markdown, end="")
+
+
+def _bench_export(dataset: str, source: str, results: list[str], out: str) -> None:
+    from pathlib import Path
+
+    from .backtest.dataset import read_jsonl
+    from .bench.tasks import export_tasks, write_tasks
+
+    tasks = export_tasks(read_jsonl(dataset), [Path(r) for r in results], source)
+    print(f"wrote {write_tasks(tasks, out)} tasks to {out}")
+
+
+def _bench_verify(tasks_file: str, source: str, only: str | None, out: str | None) -> None:
+    import json
+    from dataclasses import asdict
+    from pathlib import Path
+
+    from .backtest.checkout import prepare_worktree
+    from .bench.tasks import BenchTask, read_tasks
+    from .bench.verify import verify_tasks
+    from .config import get_settings
+
+    tasks = read_tasks(tasks_file)
+    if only:
+        wanted = {int(n) for n in only.split(",")}
+        tasks = [t for t in tasks if t.issue_number in wanted]
+    root = Path(get_settings().workspace_root) / "bench"
+
+    def prepare(task: BenchTask) -> Path:
+        return prepare_worktree(source, task.base_commit, root / task.instance_id)
+
+    checks = verify_tasks(tasks, prepare)
+    for check in checks:
+        status = "ok" if check.ok else f"FAILED: {check.error}"
+        print(f"{check.instance_id}: {status} ({check.latency_s}s)")
+    if out:
+        lines = "".join(json.dumps(asdict(c)) + "\n" for c in checks)
+        Path(out).write_text(lines, encoding="utf-8")
+    failed = sum(1 for c in checks if not c.ok)
+    print(f"{len(checks) - failed}/{len(checks)} tasks verified")
+    if failed or not checks:
+        raise SystemExit(1)
 
 
 def _backtest_report(results: str, title: str, out: str | None) -> None:

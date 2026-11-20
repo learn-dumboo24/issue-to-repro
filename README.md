@@ -158,6 +158,15 @@ On Gemini 3.1 Flash-Lite (free tier) all four bugs were verified and the feature
 classified as such, with no test written: 6–9 model calls and 11k–25k tokens per issue
 ([`results/demo-flash-lite.md`](results/demo-flash-lite.md)).
 
+### Benchmark tasks
+
+Every verified reproduction is also a reusable eval task: the issue as filed, the buggy commit, a
+test that fails there, and the maintainers' fix that makes it pass. `bench export` writes them;
+`bench verify` re-proves each one from scratch, with no model, and CI does the same in the Docker
+sandbox. [`bench/click.jsonl`](bench/click.jsonl) has **10 tasks from Click, all re-verified**;
+the [datasheet](bench/README.md) covers the fields, how to evaluate a fixing agent, and the
+limitations.
+
 ## Roadmap
 
 Built in phases; each phase lands as one pull request and a tagged release
@@ -172,7 +181,7 @@ Built in phases; each phase lands as one pull request and a tagged release
 | 5. Observability | OpenTelemetry spans, per-agent cost/latency breakdown, [dashboard](https://learn-dumboo24.github.io/issue-to-repro/) | ✅ v0.5.0 |
 | 6. Production | Webhook service, comment-only GitHub App with maintainer approval, [end-to-end demo](#end-to-end-demo) (4/4 planted bugs verified); next: Cloud Run, Cloud Trace export | 🚧 Part 1 merged |
 | 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
-| 8. Benchmarks | Export fixed issues as verified fail-to-pass agent benchmark tasks | Planned |
+| 8. Benchmarks | Verified fail-to-pass agent tasks from fixed issues: [10 Click tasks](bench/README.md), re-proved in the Docker sandbox in CI | ✅ Merged |
 
 Public repositories only.
 

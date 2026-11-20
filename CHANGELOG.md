@@ -12,6 +12,15 @@ All notable changes are listed here. The format follows
   [issue-to-repro-demo](https://github.com/learn-dumboo24/issue-to-repro-demo), has four planted
   bugs and one feature request; on Gemini 3.1 Flash-Lite all four bugs were verified and the
   feature request got no test ([`results/demo-flash-lite.md`](results/demo-flash-lite.md)).
+- `bench export` / `bench verify`: turn verified reproductions into benchmark tasks (issue text,
+  buggy commit, fail-to-pass test, the maintainers' fix as a patch) and re-prove each one without
+  any model. [`bench/click.jsonl`](bench/click.jsonl) has 10 tasks from Click, all re-verified;
+  a CI workflow re-proves them in the Docker sandbox. Datasheet in
+  [`bench/README.md`](bench/README.md).
+
+### Changed
+- `prepare_worktree`: the worktree-and-venv step of `prepare_checkout`, now shared with
+  `bench verify`.
 
 ## [0.5.0] - Phase 5: Observability
 
