@@ -28,6 +28,10 @@ WRONG_REASON = re.compile(
     r"fixture '[^']+' not found|^E\s+(ModuleNotFoundError|ImportError|SyntaxError|IndentationError)\b",
     re.MULTILINE,
 )
+# pytest's summary line when some tests failed and others passed, e.g. "1 failed, 1 passed in 0.1s".
+SOME_PASSED = re.compile(
+    r"^(?=.*\b\d+ failed\b)(?=.*\b\d+ x?passed\b).*\bin [\d.]+s\b", re.MULTILINE
+)
 OUTPUT_TAIL_CHARS = 4_000
 
 
@@ -35,6 +39,7 @@ class RunOutcome(StrEnum):
     FAILED = "failed"  # test ran and failed: candidate reproduction
     PASSED = "passed"  # bug not reproduced
     INVALID = "invalid"  # failed for the wrong reason (collection, import, fixture)
+    PARTIAL = "partial"  # some tests failed but others passed on the same code
     TIMEOUT = "timeout"
     ERROR = "error"  # pytest internal or usage error
 
@@ -52,7 +57,11 @@ def classify_run(returncode: int, output: str) -> RunOutcome:
     if returncode == 0:
         return RunOutcome.PASSED
     if returncode == 1:
-        return RunOutcome.INVALID if WRONG_REASON.search(output) else RunOutcome.FAILED
+        if WRONG_REASON.search(output):
+            return RunOutcome.INVALID
+        # A test that passes on the buggy code shows nothing about the bug, and one asserting the
+        # current behaviour would fail once the bug is fixed: every test in the file must fail.
+        return RunOutcome.PARTIAL if SOME_PASSED.search(output) else RunOutcome.FAILED
     if returncode in (2, 5):  # collection errors / interrupted, or no tests collected
         return RunOutcome.INVALID
     return RunOutcome.ERROR
@@ -63,7 +72,7 @@ def combine(outcomes: list[RunOutcome]) -> Verdict:
     if not outcomes:
         raise ValueError("no runs to combine")
     kinds = set(outcomes)
-    if RunOutcome.INVALID in kinds:
+    if kinds & {RunOutcome.INVALID, RunOutcome.PARTIAL}:
         return Verdict.INVALID
     if kinds & {RunOutcome.TIMEOUT, RunOutcome.ERROR}:
         return Verdict.ERROR
@@ -108,14 +117,25 @@ def _run_repeatedly(root: Path, target: Path) -> dict[str, Any]:
     for _ in range(settings.repro_runs):
         outcome, output = _run_once(root, target, settings.test_timeout_s)
         outcomes.append(outcome)
-        if outcome in (RunOutcome.INVALID, RunOutcome.ERROR, RunOutcome.TIMEOUT):
+        if outcome in (
+            RunOutcome.INVALID,
+            RunOutcome.PARTIAL,
+            RunOutcome.ERROR,
+            RunOutcome.TIMEOUT,
+        ):
             break  # later runs cannot change the verdict
-    return {
+    result: dict[str, Any] = {
         "verdict": str(combine(outcomes)),
         "runs": [str(o) for o in outcomes],
         "test_path": str(target.relative_to(root)),
         "last_output_tail": output[-OUTPUT_TAIL_CHARS:],
     }
+    if RunOutcome.PARTIAL in outcomes:
+        result["note"] = (
+            "Some tests in the file passed on the current code. Every test must fail because of "
+            "the reported bug: remove tests that pass, and never assert the current, buggy behaviour."
+        )
+    return result
 
 
 def _run_once(root: Path, target: Path, timeout_s: int) -> tuple[RunOutcome, str]:

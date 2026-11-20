@@ -29,6 +29,20 @@ def test_run_reproduction_verdicts(workspace, code, verdict):
     assert result["verdict"] == verdict, result["last_output_tail"]
 
 
+MIXED = (
+    "from demo import add\n\n"
+    "def test_bug():\n    assert add(2, 2) == 4\n\n"
+    "def test_current_behaviour():\n    assert add(2, 2) == 0\n"
+)
+
+
+def test_a_file_where_some_tests_pass_is_not_a_reproduction(workspace):
+    result = run_reproduction(str(workspace), "test_issue_repro_3.py", MIXED)
+    assert (result["verdict"], result["runs"]) == ("invalid", ["partial"])
+    assert "Every test must fail" in result["note"]
+    assert "note" not in run_reproduction(str(workspace), "test_issue_repro_4.py", FAILING)
+
+
 def test_invalid_run_stops_early(workspace):
     result = run_reproduction(str(workspace), "test_issue_repro_2.py", BROKEN_IMPORT)
     assert result["runs"] == ["invalid"]
@@ -57,6 +71,11 @@ def test_tool_wrapper_reports_errors_instead_of_raising(workspace):
 def test_classify_run_exit_codes():
     assert classify_run(0, "") is RunOutcome.PASSED
     assert classify_run(1, "1 failed") is RunOutcome.FAILED
+    assert classify_run(1, "2 failed in 0.10s") is RunOutcome.FAILED
+    assert classify_run(1, "1 failed, 1 passed in 0.11s") is RunOutcome.PARTIAL
+    assert classify_run(1, "1 failed, 2 passed, 1 warning in 2.5s") is RunOutcome.PARTIAL
+    assert classify_run(1, "1 failed, 1 xpassed in 0.11s") is RunOutcome.PARTIAL
+    assert classify_run(1, "passed\n1 failed in 0.1s") is RunOutcome.FAILED  # not one summary
     assert classify_run(1, "E   ModuleNotFoundError: No module named 'x'") is RunOutcome.INVALID
     assert classify_run(2, "error during collection") is RunOutcome.INVALID
     assert classify_run(5, "no tests ran") is RunOutcome.INVALID
