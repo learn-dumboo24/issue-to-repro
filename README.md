@@ -167,6 +167,14 @@ sandbox. [`bench/click.jsonl`](bench/click.jsonl) has **10 tasks from Click, all
 the [datasheet](bench/README.md) covers the fields, how to evaluate a fixing agent, and the
 limitations.
 
+### Shadow mode
+
+`shadow run` tries the agents on recent open bug reports of real projects (Click, Jinja, attrs,
+Typer) and keeps the results for review; **nothing is posted**. A manually started workflow runs
+it on GitHub Actions in the Docker sandbox and pushes the results to a review branch. A person
+checks each reproduction before offering it to the maintainers. Selection rules, the review
+checklist and the safety design are in [`shadow/README.md`](shadow/README.md).
+
 ## Roadmap
 
 Built in phases; each phase lands as one pull request and a tagged release
@@ -180,7 +188,7 @@ Built in phases; each phase lands as one pull request and a tagged release
 | 4. Retrieval | Gemini-embedding code search; right file first 87% vs 52% for keyword search | ✅ v0.4.0 |
 | 5. Observability | OpenTelemetry spans, per-agent cost/latency breakdown, [dashboard](https://learn-dumboo24.github.io/issue-to-repro/) | ✅ v0.5.0 |
 | 6. Production | Webhook service, comment-only GitHub App with maintainer approval, [end-to-end demo](#end-to-end-demo) (4/4 planted bugs verified); next: Cloud Run, Cloud Trace export | 🚧 Part 1 merged |
-| 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
+| 7. Real users | [Shadow mode](shadow/README.md) on open issues of Click, Jinja, attrs and Typer; review, then offer tests to maintainers; public write-up | 🚧 In progress |
 | 8. Benchmarks | Verified fail-to-pass agent tasks from fixed issues: [10 Click tasks](bench/README.md), re-proved in the Docker sandbox in CI | ✅ Merged |
 
 Public repositories only.
