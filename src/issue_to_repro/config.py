@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # A case only starts if its worst-case cost still fits under the cap.
     backtest_max_usd: float | None = None
 
+    # Webhook service (service/). The secret is required: the app refuses to start without it.
+    github_webhook_secret: SecretStr | None = None
+    # A maintainer adds this label to approve posting the stored reproduction as a comment.
+    approve_label: str = "issue-to-repro:approved"
+
     # Optional; raises GitHub's API rate limit. Public issues work without it.
     github_token: SecretStr | None = None
 
