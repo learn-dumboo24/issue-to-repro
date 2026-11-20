@@ -18,6 +18,12 @@ All notable changes are listed here. The format follows
   a CI workflow re-proves them in the Docker sandbox. Datasheet in
   [`bench/README.md`](bench/README.md).
 
+- `shadow run` / `shadow report`: run the agents on recent open bug reports of real projects and
+  keep the results for review, posting nothing. Issues are picked by age, labels and whether the
+  report contains code; runs refuse to start outside the Docker sandbox. A manually started
+  workflow runs it on GitHub Actions, with the model key and the write token in separate jobs.
+- `list_open_issues`: the newest open issues of a repository, pull requests left out.
+
 ### Changed
 - `prepare_worktree`: the worktree-and-venv step of `prepare_checkout`, now shared with
   `bench verify`.

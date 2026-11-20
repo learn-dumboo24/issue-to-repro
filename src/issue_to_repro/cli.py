@@ -85,6 +85,20 @@ def build_parser() -> argparse.ArgumentParser:
     bench_verify.add_argument("--only", help="Comma-separated issue numbers (default: all)")
     bench_verify.add_argument("--out", help="Also write per-task checks here (.jsonl)")
 
+    shadow = commands.add_parser("shadow", help="Shadow mode on real open issues (nothing posted)")
+    shadow_commands = shadow.add_subparsers(dest="shadow_command", required=True)
+    shadow_run = shadow_commands.add_parser(
+        "run", help="Pick recent bug reports and reproduce them (needs SANDBOX=docker)"
+    )
+    shadow_run.add_argument("--config", required=True, help="JSON with repos and selection limits")
+    shadow_run.add_argument("--out", required=True, help="Results .jsonl (appended; reruns resume)")
+    shadow_run.add_argument("--repos", help="Comma-separated subset of the config's repos")
+    shadow_run.add_argument("--per-repo", type=int, help="Override the config's per_repo")
+    shadow_report = shadow_commands.add_parser("report", help="Summarise shadow results")
+    shadow_report.add_argument("--results", required=True, help="Results .jsonl from shadow run")
+    shadow_report.add_argument("--title", default="Shadow run")
+    shadow_report.add_argument("--out", help="Write Markdown here instead of printing it")
+
     trace_cmd = commands.add_parser("trace", help="Analyse OpenTelemetry span files")
     trace_commands = trace_cmd.add_subparsers(dest="trace_command", required=True)
     trace_report = trace_commands.add_parser("report", help="Per-agent / per-case breakdown")
@@ -147,6 +161,11 @@ def main(argv: list[str] | None = None) -> None:
             _bench_export(args.dataset, args.source, args.results, args.out)
         else:
             _bench_verify(args.tasks, args.source, args.only, args.out)
+    elif args.command == "shadow":
+        if args.shadow_command == "run":
+            _shadow_run(args.config, args.out, args.repos, args.per_repo)
+        else:
+            _shadow_report(args.results, args.title, args.out)
     elif args.command == "trace":
         _trace_report(args.trace, args.title, args.out)
     elif args.command == "retrieval":
@@ -287,6 +306,65 @@ def _bench_verify(tasks_file: str, source: str, only: str | None, out: str | Non
     print(f"{len(checks) - failed}/{len(checks)} tasks verified")
     if failed or not checks:
         raise SystemExit(1)
+
+
+def _shadow_run(config_path: str, out: str, repos: str | None, per_repo: int | None) -> None:
+    from dataclasses import replace
+    from pathlib import Path
+
+    from .backtest.checkout import prepare_live_checkout
+    from .backtest.runner import run_prompt_adk
+    from .config import get_settings
+    from .shadow.run import done_issues, load_results, run_shadow
+    from .shadow.select import load_config, select_issues
+    from .tools.github import list_open_issues
+
+    settings = get_settings()
+    if settings.sandbox != "docker":
+        raise SystemExit("shadow runs execute untrusted code: set SANDBOX=docker")
+    config = load_config(config_path)
+    if per_repo is not None:
+        config = replace(config, per_repo=per_repo)
+    chosen_repos = config.repos
+    if repos:
+        wanted = repos.split(",")
+        unknown = set(wanted) - set(config.repos)
+        if unknown:
+            raise SystemExit(f"not in the config: {sorted(unknown)}")
+        chosen_repos = tuple(r for r in config.repos if r in wanted)
+    results_path = Path(out)
+    done = done_issues(load_results(results_path))
+    candidates = []
+    for repo in chosen_repos:
+        picked = select_issues(repo, list_open_issues(repo), config, done)
+        print(f"{repo}: {[c.number for c in picked]}")
+        candidates += picked
+
+    def prepare(name: str, number: int) -> Path:
+        return prepare_live_checkout(name, number, settings.workspace_root)
+
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    for r in run_shadow(candidates, results_path, prepare, run_prompt_adk, settings):
+        print(
+            f"{r.repo}#{r.issue}: {r.classification} {r.verdict} calls={r.llm_calls} "
+            f"tokens={r.tokens} {r.latency_s}s stopped={r.stopped} error={r.error}"
+        )
+
+
+def _shadow_report(results: str, title: str, out: str | None) -> None:
+    from pathlib import Path
+
+    from .shadow.run import load_results, render_markdown
+
+    rows = load_results(Path(results))
+    if not rows:
+        raise SystemExit(f"no results in {results}")
+    markdown = render_markdown(rows, title)
+    if out:
+        Path(out).write_text(markdown, encoding="utf-8")
+        print(f"wrote {out}")
+    else:
+        print(markdown, end="")
 
 
 def _backtest_report(results: str, title: str, out: str | None) -> None:
