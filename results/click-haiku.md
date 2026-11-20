@@ -45,7 +45,9 @@ max per case, retriever capped at 8 tool calls, 3 sandbox runs per verdict.
 - Haiku verified every case Flash-Lite did, plus **#2877** (`BytesWarning` under `python -bb`),
   which Flash-Lite never reproduced.
 - Both models correctly left the two feature requests (#2983, #2869) without an attempt.
-- **#3403** is the one bug report neither model verified.
+- **#3403** is the one bug report neither model verified, and it turned out not to be
+  reproducible as filed (see `datasets/README.md` → Known issues). On the 9 cases that are
+  reproducible bug reports, Haiku verified **9 of 9** and Flash-Lite 8 of 9.
 - Costs are upper bounds from `backtest/pricing.py` (all prompt tokens priced as uncached input).
 
 ## Setup

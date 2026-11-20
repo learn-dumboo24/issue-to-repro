@@ -28,8 +28,11 @@
   order from the issue's example. The verifier rejected it because the order the issue
   describes passed at the buggy commit, and the real-fix check agreed: the test still failed
   after the fix.
-- **Open question:** #3403 may not be reproducible from its issue text at its base commit.
-  Next step: run the issue's own snippet at the buggy commit to tell a model limitation from
-  a dataset-quality issue.
+- **Resolved: #3403 is not reproducible as filed.** Running the issue's own snippet with no
+  arguments prints `enable_xyz = False` at the buggy commit, which is the behaviour the reporter
+  asked for, and `True` after the real fix (the fix "respects explicit defaults", the opposite
+  direction). The other four invocations behave the same at both commits. No test that follows
+  the issue text can fail before the fix and pass after it, so this case measures the dataset,
+  not the model. See `datasets/README.md` → Known issues.
 - **Setup:** pipeline at `d07e9a7`, both models `claude-sonnet-5-5`, `SANDBOX=docker`,
   `BACKTEST_MAX_TOKENS=150000`, `BACKTEST_MAX_USD=2.00`. Estimated cost ≤ $0.37 (upper bound).
