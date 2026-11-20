@@ -170,7 +170,7 @@ Built in phases; each phase lands as one pull request and a tagged release
 | 3. Sandbox | Reproductions in a locked-down container; isolation tested in CI | ✅ v0.3.0 |
 | 4. Retrieval | Gemini-embedding code search; right file first 87% vs 52% for keyword search | ✅ v0.4.0 |
 | 5. Observability | OpenTelemetry spans, per-agent cost/latency breakdown, [dashboard](https://learn-dumboo24.github.io/issue-to-repro/) | ✅ v0.5.0 |
-| 6. Production | Cloud Run webhook + comment-only GitHub App with maintainer approval; Cloud Trace export | Next |
+| 6. Production | Webhook service, comment-only GitHub App with maintainer approval, [end-to-end demo](#end-to-end-demo) (4/4 planted bugs verified); next: Cloud Run, Cloud Trace export | 🚧 Part 1 merged |
 | 7. Real users | Shadow-mode reports for 2–3 open-source projects; public write-up | Planned |
 | 8. Benchmarks | Export fixed issues as verified fail-to-pass agent benchmark tasks | Planned |
 
