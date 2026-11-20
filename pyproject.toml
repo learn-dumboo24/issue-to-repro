@@ -30,7 +30,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov --cov-report=term"
+addopts = "--cov --cov-report=term -m 'not docker'"
+markers = ["docker: integration tests that start real containers (run with -m docker)"]
 
 [tool.ruff]
 line-length = 100

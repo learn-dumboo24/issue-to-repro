@@ -32,3 +32,19 @@ jobs:
         run: uv run mypy
       - name: Tests
         run: uv run pytest -q
+
+  docker-sandbox:
+    name: Docker sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving v10 tag upstream; pin exact
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Pull the sandbox image
+        run: docker pull -q mirror.gcr.io/library/debian:bookworm-slim
+      - name: Container isolation tests
+        run: uv run pytest -q -m docker --no-cov
